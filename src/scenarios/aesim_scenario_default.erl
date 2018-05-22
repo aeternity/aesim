@@ -72,9 +72,7 @@ scenario_start(State, Nodes, Sim) ->
   aesim_scenario:print_header(?PROGRESS_SPECS),
   {State, Nodes2, Sim3}.
 
-scenario_has_terminated(_State, _Nodes, Sim) ->
-  #{time := SimTime, max_time := MaxTime} = Sim,
-  SimTime >= MaxTime.
+scenario_has_terminated(_State, _Nodes, _Sim) -> false.
 
 scenario_progress(State, Nodes, Sim) ->
   EventCount = aesim_events:size(Sim),
