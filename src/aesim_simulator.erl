@@ -11,7 +11,8 @@
 
 %=== MACROS ====================================================================
 
--define(DEFAULT_MAX_TIME,              2 * 60 * 60 * 1000). % 2h
+-define(DEFAULT_MAX_SIM_TIME,          2 * 60 * 60 * 1000). % 2h
+-define(DEFAULT_MAX_REAL_TIME,                   infinity).
 -define(DEFAULT_SCENARIO_MOD,      aesim_scenario_default).
 -define(DEFAULT_PROGRESS_INTERVAL,                   1000).
 -define(SIM_IMMUTABLES, [config, real_start_time, time, max_time,
@@ -38,7 +39,8 @@ run(Opts)->
     config => Config,
     real_start_time => StartTime,
     time => 0,
-    max_time => cfg_max_time(Config),
+    max_real_time => cfg_max_real_time(Config),
+    max_sim_time => cfg_max_sim_time(Config),
     progress_sim_time => 0,
     progress_sim_interval => 0,
     progress_real_time => StartTime,
@@ -55,11 +57,12 @@ run(Opts)->
 
 -spec loop(state(), sim()) -> ok.
 loop(State, Sim) ->
-  case scenario_has_terminated(State, Sim) of
+  RealNow = erlang:system_time(millisecond),
+  case has_terminated(State, RealNow, Sim) of
     true ->
       scenario_report(State, timeout, Sim);
     false ->
-      {State2, Sim2} = progress(State, Sim),
+      {State2, Sim2} = progress(State, RealNow, Sim),
       case aesim_events:next(Sim2) of
         empty ->
           scenario_report(State2, frozen, Sim2);
@@ -70,12 +73,11 @@ loop(State, Sim) ->
       end
   end.
 
-progress(State, Sim) ->
+progress(State, RealNow, Sim) ->
   #{time := SimTime,
     progress_sim_time := LastSimProgress,
     progress_real_time := LastRealProgress
   } = Sim,
-  RealNow = erlang:system_time(millisecond),
   case RealNow >= (LastRealProgress + cfg_progress_interval(Sim)) of
     false -> {State, Sim};
     true ->
@@ -87,6 +89,19 @@ progress(State, Sim) ->
       },
       scenario_progress(State, Sim2)
   end.
+
+has_terminated(State, RealNow, Sim) ->
+  #{time := SimTime,
+    real_start_time := RealStartTime,
+    max_sim_time := MaxSimTime,
+    max_real_time := MaxRealTime
+  } = Sim,
+  check_terminated(RealNow - RealStartTime, MaxRealTime)
+    orelse check_terminated(SimTime, MaxSimTime)
+    orelse scenario_has_terminated(State, Sim).
+
+check_terminated(_Time, infinity) -> false;
+check_terminated(Time, MaxTime) -> Time >= MaxTime.
 
 update_time(NextTime, Sim) ->
   #{time := Time} = Sim,
@@ -168,13 +183,16 @@ parse_options(Opts) ->
   Config = aesim_config:parse(#{}, Opts, [
     {scenario_mod, atom, ?DEFAULT_SCENARIO_MOD},
     {progress_interval, integer, ?DEFAULT_PROGRESS_INTERVAL},
-    {max_time, time, ?DEFAULT_MAX_TIME}
+    {max_sim_time, time_infinity, ?DEFAULT_MAX_SIM_TIME},
+    {max_real_time, time_infinity, ?DEFAULT_MAX_REAL_TIME}
   ]),
   Config2 = aesim_nodes:parse_options(Config, Opts),
   ScenarioMod = cfg_scenario_mod(Config2),
   ScenarioMod:parse_options(Config2, Opts).
 
-cfg_max_time(Config) -> aesim_config:get(Config, max_time).
+cfg_max_real_time(Config) -> aesim_config:get(Config, max_real_time).
+
+cfg_max_sim_time(Config) -> aesim_config:get(Config, max_sim_time).
 
 cfg_scenario_mod(Config) -> aesim_config:get(Config, scenario_mod).
 

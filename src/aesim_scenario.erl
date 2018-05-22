@@ -112,7 +112,7 @@ print_fields(Specs, Fields) ->
 -spec calculate_progress(sim()) -> map().
 calculate_progress(Sim) ->
   #{real_start_time := RealStartTime,
-    max_time := SimMaxTime,
+    max_sim_time := SimMaxTime,
     progress_sim_time := SimProgress,
     progress_sim_interval := SimInterval,
     progress_real_time := RealProgress,

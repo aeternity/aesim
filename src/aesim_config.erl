@@ -13,7 +13,7 @@
 %=== TYPES =====================================================================
 
 -type opt_name() :: atom().
--type opt_type() :: string | integer | atom | time.
+-type opt_type() :: string | integer | atom | time | time_infinity.
 -type spec() :: {opt_name(), opt_type(), term()}.
 -type specs() :: [spec()].
 
@@ -42,6 +42,9 @@ convert(string, _Key, Value) when is_list(Value) -> Value;
 convert(_Type, Key, "") -> error({bad_option, {Key, ""}});
 convert(atom, _Key, Value) when is_list(Value) -> list_to_atom(Value);
 convert(time, Key, Value) when is_list(Value) -> parse_time(Key, Value);
+convert(time_infinity, Key, infinity) -> infinity;
+convert(time_infinity, Key, Value) when is_list(Value) ->
+  parse_time(Key, Value);
 convert(integer, Key, Value) when is_list(Value) ->
   try
     list_to_integer(Value)

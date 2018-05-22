@@ -19,7 +19,7 @@ Arguments
 When running a scenario, all the possible options are printed before running
 the simulation. The options can be changed with:
 
-    $ _build/default/bin/aesim max_time=5h max_nodes=200
+    $ _build/default/bin/aesim max_sim_time=5h max_nodes=200
 
 ### Time Arguments
 
