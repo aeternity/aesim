@@ -41,11 +41,12 @@
 
 -spec parse_options(map(), map()) -> map().
 parse_options(Config, Opts) ->
-  Config2 = Config#{
-    bootstrap_size => maps:get(bootstrap_size, Opts, ?DEFAULT_BOOTSTRAP_SIZE),
-    trusted_count => maps:get(trusted_count, Opts, ?DEFAULT_TRUSTED_COUNT)
-  },
-  aesim_node:parse_options(Config2, Opts).
+  aesim_config:parse(Config, Opts, [
+    {bootstrap_size, integer, ?DEFAULT_BOOTSTRAP_SIZE},
+    {trusted_count, integer, ?DEFAULT_TRUSTED_COUNT}
+  ], [
+    fun aesim_node:parse_options/2
+  ]).
 
 -spec new(sim()) -> {state(), sim()}.
 new(Sim) ->

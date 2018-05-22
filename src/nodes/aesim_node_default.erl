@@ -1,6 +1,7 @@
 -module(aesim_node_default).
 
-%% @doc Default node behaviour.
+%% @doc Node behaviour of the current epoch p2p protocol (as of 0.14.0)
+%%  - Connects to all identified peers.
 %%  - Prunes node connections based on node id; it keeps outbound connection from
 %%  the peers with bigger id.
 %%  - Send gossip pings periodically.
@@ -25,7 +26,7 @@
 %=== MACROS ====================================================================
 
 -define(DEFAULT_FIRST_PING_DELAY,        10).
--define(DEFAULT_PING_PERIOD,         120000).
+-define(DEFAULT_PING_PERIOD,           "2m").
 -define(DEFAULT_PONG_DELAY,              10).
 -define(DEFAULT_GOSSIPED_NEIGHBOURS,     30).
 
@@ -44,6 +45,8 @@ node_new(AddrMap, _Context, Sim) ->
 
 node_handle_event(State, conn_established, {PeerId, ConnRef, ConnType}, Context, Sim) ->
   on_connection_established(State, PeerId, ConnRef, ConnType, Context, Sim);
+node_handle_event(State, peer_identified, PeerId, Context, Sim) ->
+  on_peer_identified(State, PeerId, Context, Sim);
 node_handle_event(State, do_ping, ConnRef, Context, Sim) ->
   do_ping(State, ConnRef, Context, Sim);
 node_handle_event(State, do_pong, {ConnRef, Exclude}, Context, Sim) ->
@@ -124,6 +127,15 @@ do_pong(State, ConnRef, Exclude, Context, Sim) ->
   #{node_addr := NodeAddr} = Context,
   {Neighbours, Sim2} = get_neighbours(Exclude, Context, Sim),
   {State, send_pong(ConnRef, NodeAddr, Neighbours, Context, Sim2)}.
+
+on_peer_identified(State, PeerId, Context, Sim) ->
+  #{node_id := NodeId, conns := Conns} = Context,
+  case aesim_connections:has_connection(Conns, PeerId) of
+    true -> ignore;
+    false ->
+      {_, Sim2} = aesim_node:sched_connect(0, NodeId, PeerId, Sim),
+      {State, Sim2}
+  end.
 
 on_connection_established(State, PeerId, ConnRef, outbound, Context, Sim) ->
   chain(State, {PeerId, ConnRef}, Context, Sim, [

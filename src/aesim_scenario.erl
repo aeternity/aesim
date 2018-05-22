@@ -53,7 +53,6 @@
 %=== EXPORTS ===================================================================
 
 -export([post/4]).
--export([print_config/1]).
 -export([print_separator/0]).
 -export([print_title/1]).
 -export([print_header/1]).
@@ -81,12 +80,6 @@
 -spec post(delay(), event_name(), term(), sim()) -> {event_ref(), sim()}.
 post(Delay, Name, Params, Sim) ->
   aesim_events:post(Delay, [scenario], Name, Params, Sim).
-
-print_config(Sim) ->
-  #{config := Config} = Sim,
-  lists:foreach(fun({K, V}) ->
-    aesim_utils:print(" ~-20s: ~30w~n", [K, V])
-  end, lists:keysort(1, maps:to_list(Config))).
 
 -spec print_separator() -> ok.
 print_separator() ->
@@ -118,8 +111,12 @@ calculate_progress(Sim) ->
     progress_real_time := RealProgress,
     progress_real_interval := RealInterval
   } = Sim,
+  Progress = case SimMaxTime =:= infinity of
+    false -> (SimProgress * 100) div SimMaxTime;
+    true -> 0
+  end,
   #{
-    progress => (SimProgress * 100) div SimMaxTime,
+    progress => Progress,
     real_time => RealProgress - RealStartTime,
     sim_time => SimProgress,
     current_speed => SimInterval / RealInterval,

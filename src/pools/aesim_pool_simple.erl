@@ -2,7 +2,6 @@
 
 %% @doc Simple pool behaviour.
 %%  - Adds all identified peers to the pool.
-%%  - Request a connection to all peers yet when added.
 
 -behaviour(aesim_pool).
 
@@ -46,13 +45,6 @@ on_peer_identified(State, PeerId, Context, Sim) ->
   %% Automatically connect to any new peer not yet connected
   #{node_id := NodeId, conns := Conns} = Context,
   case maps:is_key(PeerId, State) of
-    true -> ignore;
-    false ->
-      State2 = State#{PeerId => true},
-      case aesim_connections:has_connection(Conns, PeerId) of
-        true -> {State2, Sim};
-        false ->
-          {_, Sim2} = aesim_node:sched_connect(0, NodeId, PeerId, Sim),
-          {State2, Sim2}
-      end
+    false -> {State#{PeerId => true}, Sim};
+    true -> ignore
   end.

@@ -11,10 +11,10 @@
 
 %=== MACROS ====================================================================
 
--define(DEFAULT_MAX_SIM_TIME,          2 * 60 * 60 * 1000). % 2h
+-define(DEFAULT_MAX_SIM_TIME,                        "2h").
 -define(DEFAULT_MAX_REAL_TIME,                   infinity).
 -define(DEFAULT_SCENARIO_MOD,      aesim_scenario_default).
--define(DEFAULT_PROGRESS_INTERVAL,                   1000).
+-define(DEFAULT_PROGRESS_INTERVAL,                   "1s").
 -define(SIM_IMMUTABLES, [config, real_start_time, time, max_time,
                          progress_sim_time, progress_sim_interval,
                          progress_real_time, progress_real_interval]).
@@ -131,46 +131,40 @@ nodes_route_event(State, EventAddr, Name, Params, Sim) ->
 %--- SCENARIO CALLBACK FUNCTIONS -----------------------------------------------
 
 scenario_new(Sim) ->
-  % Mod = cfg_scenario_mod(Sim),
-  % {Sub, Sim2} = Mod:scenario_new(Sim),
-  {Sub, Sim2} = aesim_scenario_default:scenario_new(Sim),
+  Mod = cfg_scenario_mod(Sim),
+  {Sub, Sim2} = Mod:scenario_new(Sim),
   ?CHECK_SIM(Sim, Sim2),
   {Sub, Sim2}.
 
 scenario_start(State, Sim) ->
   #{scenario := Sub, nodes := Nodes} = State,
-  % Mod = cfg_scenario_mod(Sim),
-  % {Sub2, Nodes2, Sim2} = Mod:scenario_start(Sub, Nodes, Sim),
-  {Sub2, Nodes2, Sim2} = aesim_scenario_default:scenario_start(Sub, Nodes, Sim),
+  Mod = cfg_scenario_mod(Sim),
+  {Sub2, Nodes2, Sim2} = Mod:scenario_start(Sub, Nodes, Sim),
   ?CHECK_SIM(Sim, Sim2),
   {State#{scenario := Sub2, nodes := Nodes2}, Sim2}.
 
 scenario_has_terminated(State, Sim) ->
   #{scenario := Sub, nodes := Nodes} = State,
-  % Mod = cfg_scenario_mod(Sim),
-  % Mod:scenario_has_terminated(Sub, Nodes, Sim).
-  aesim_scenario_default:scenario_has_terminated(Sub, Nodes, Sim).
+  Mod = cfg_scenario_mod(Sim),
+  Mod:scenario_has_terminated(Sub, Nodes, Sim).
 
 scenario_progress(State, Sim) ->
   #{scenario := Sub, nodes := Nodes} = State,
-  % Mod = cfg_scenario_mod(Sim),
-  % {Sub2, Sim2} = Mod:scenario_progress(Sub, Nodes, Sim),
-  {Sub2, Sim2} = aesim_scenario_default:scenario_progress(Sub, Nodes, Sim),
+  Mod = cfg_scenario_mod(Sim),
+  {Sub2, Sim2} = Mod:scenario_progress(Sub, Nodes, Sim),
   ?CHECK_SIM(Sim, Sim2),
   {State#{scenario := Sub2}, Sim2}.
 
 scenario_report(State, Reason, Sim) ->
   #{scenario := Sub, nodes := Nodes} = State,
-  % Mod = cfg_scenario_mod(Sim),
-  %Mod:scenario_report(Sub, Reason, Nodes, Sim),
-  aesim_scenario_default:scenario_report(Sub, Reason, Nodes, Sim),
+  Mod = cfg_scenario_mod(Sim),
+  Mod:scenario_report(Sub, Reason, Nodes, Sim),
   ok.
 
 scenario_handle_event(State, Name, Params, Sim) ->
   #{scenario := Sub, nodes := Nodes} = State,
-  % Mod = cfg_scenario_mod(Sim),
-  % case Mod:scenario_handle_event(Sub, Name, Params, Nodes, Sim) of
-  case aesim_scenario_default:scenario_handle_event(Sub, Name, Params, Nodes, Sim) of
+  Mod = cfg_scenario_mod(Sim),
+  case Mod:scenario_handle_event(Sub, Name, Params, Nodes, Sim) of
     ignore -> {State, Sim};
     {Sub2, Nodes2, Sim2} ->
       ?CHECK_SIM(Sim, Sim2),
@@ -180,15 +174,15 @@ scenario_handle_event(State, Name, Params, Sim) ->
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
 parse_options(Opts) ->
-  Config = aesim_config:parse(#{}, Opts, [
+  aesim_config:parse(aesim_config:new(), Opts, [
     {scenario_mod, atom, ?DEFAULT_SCENARIO_MOD},
-    {progress_interval, integer, ?DEFAULT_PROGRESS_INTERVAL},
+    {progress_interval, time, ?DEFAULT_PROGRESS_INTERVAL},
     {max_sim_time, time_infinity, ?DEFAULT_MAX_SIM_TIME},
     {max_real_time, time_infinity, ?DEFAULT_MAX_REAL_TIME}
-  ]),
-  Config2 = aesim_nodes:parse_options(Config, Opts),
-  ScenarioMod = cfg_scenario_mod(Config2),
-  ScenarioMod:parse_options(Config2, Opts).
+  ], [
+    {scenario_mod, parse_options},
+    fun aesim_nodes:parse_options/2
+  ]).
 
 cfg_max_real_time(Config) -> aesim_config:get(Config, max_real_time).
 

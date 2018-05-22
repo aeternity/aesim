@@ -32,7 +32,7 @@
 
 %=== MACROS ====================================================================
 
--define(DEFAULT_NODE_START_PERIOD, 30 * 1000).
+-define(DEFAULT_NODE_START_PERIOD,     "30s").
 -define(DEFAULT_MAX_NODES,               150).
 -define(PROGRESS_SPECS, [
   {integer, "PROGRESS", right, "%", 8},
@@ -67,7 +67,7 @@ scenario_start(State, Nodes, Sim) ->
   CurrCount = aesim_nodes:count(Nodes2),
   {_, Sim3} = sched_start_node(CurrCount, Sim2),
   aesim_scenario:print_title("CONFIGURATION"),
-  aesim_scenario:print_config(Sim3),
+  aesim_config:print_config(Sim3),
   aesim_scenario:print_title("SIMULATION"),
   aesim_scenario:print_header(?PROGRESS_SPECS),
   {State, Nodes2, Sim3}.

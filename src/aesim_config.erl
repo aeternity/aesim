@@ -7,42 +7,100 @@
 
 %=== EXPORTS ===================================================================
 
+-export([new/0]).
 -export([get/2]).
+-export([get_option/4]).
 -export([parse/3, parse/4]).
+-export([print_config/1]).
 
 %=== TYPES =====================================================================
 
+-type state() :: #{opt_name() => option()}.
 -type opt_name() :: atom().
--type opt_type() :: string | integer | atom | time | time_infinity.
+-type opt_type() :: string | integer | integer_infinity | atom | time | time_infinity.
 -type spec() :: {opt_name(), opt_type(), term()}.
 -type specs() :: [spec()].
+-type option() :: {opt_type(), boolean(), term(), term()}.
+-type parser_def() :: {atom(), atom()} | fun((state(), map()) -> state()).
+-type parser_defs() :: [parser_def()].
 
 %=== API FUNCTIONS =============================================================
 
--spec get(sim() | map(), opt_name()) -> term().
-get(#{config := Config}, Key) -> maps:get(Key, Config);
-get(Config, Key) -> maps:get(Key, Config).
+-spec new() -> state().
+new() -> #{}.
 
--spec parse(map(), map(), specs()) -> map().
-parse(Config, Opts, Specs) ->
-  lists:foldl(fun({Key, Type, Default}, Cfg) ->
-    Cfg#{Key => parse(Opts, Key, Type, Default)}
-  end, Config, Specs).
-
--spec parse(map(), opt_name(), opt_type(), term()) -> term().
-parse(Opts, Key, Type, Default) ->
-  case maps:find(Key, Opts) of
-    {ok, Value} -> convert(Type, Key, Value);
-    error -> Default
+-spec get(sim() | state(), opt_name()) -> term().
+get(#{config := Config}, Key) -> get(Config, Key);
+get(State, Key) ->
+  case maps:find(Key, State) of
+    error -> error({unknown_option, Key});
+    {ok, {_, _, _, Value}} -> Value
   end.
+
+-spec parse(state(), map(), specs()) -> state().
+parse(State, Opts, Specs) ->
+  parse(State, Opts, Specs, []).
+
+-spec parse(state(), map(), specs(), parser_defs()) -> state().
+parse(State, Opts, Specs, ParserFuns) ->
+  State2 = lists:foldl(fun
+    ({Key, Type, Default}, Cfg) ->
+      {IsDefault, Source, Value} = get_option(Opts, Key, Type, Default),
+      add_config(Cfg, Key, Type, IsDefault, Source, Value)
+  end, State, Specs),
+  lists:foldl(fun
+    (F, C) when is_function(F) -> F(C, Opts);
+    ({Key, FunName}, C) ->
+      Mod = get(C, Key),
+      Mod:FunName(C, Opts)
+  end, State2, ParserFuns).
+
+-spec print_config(sim() | state()) -> ok.
+print_config(#{config := Config}) -> print_config(Config);
+print_config(State) ->
+  lists:foreach(fun({N, {T, D, S, _}}) ->
+    DefStr = if D -> "(default)"; true -> "" end,
+    aesim_utils:print("~-20s: ~30s ~-17w ~9s~n", [N, S, T, DefStr])
+  end, lists:keysort(1, maps:to_list(State))).
 
 %=== INTERNAL FUNCTIONS ========================================================
 
+add_config(State, Name, Type, IsDefault, Option, Value) ->
+  Source = convert(string, Name, Option),
+  case maps:find(Name, State) of
+    error ->
+      State#{Name => {Type, IsDefault, Source, Value}};
+    {ok, {_, true, _, _}} ->
+      State#{Name => {Type, IsDefault, Source, Value}};
+    {ok, _} ->
+      State
+  end.
+
+get_option(Opts, Key, Type, Default) ->
+  case maps:find(Key, Opts) of
+    {ok, Value} -> {false, Value, convert(Type, Key, Value)};
+    error -> {true, Default, convert(Type, Key, Default)}
+  end.
+
 convert(string, _Key, Value) when is_list(Value) -> Value;
 convert(_Type, Key, "") -> error({bad_option, {Key, ""}});
-convert(atom, _Key, Value) when is_list(Value) -> list_to_atom(Value);
-convert(time, Key, Value) when is_list(Value) -> parse_time(Key, Value);
-convert(time_infinity, Key, infinity) -> infinity;
+convert(atom, _Key, Value) when is_atom(Value) -> Value;
+convert(integer, _Key, Value) when is_integer(Value) -> Value;
+convert(integer_infinity, _Key, Value) when is_integer(Value) -> Value;
+convert(integer_infinity, _Key, infinity) -> infinit;
+convert(integer_infinity, _Key, "infinity") -> infinity;
+convert(time, _Key, Value) when is_integer(Value), Value >= 0 -> Value;
+convert(time_infinity, _Key, Value) when is_integer(Value), Value >= 0 -> Value;
+convert(time_infinity, _Key, infinity) -> infinity;
+convert(time_infinity, _Key, "infinity") -> infinity;
+convert(string, _Key, Value) when is_atom(Value) ->
+  atom_to_list(Value);
+convert(string, _Key, Value) when is_integer(Value) ->
+  integer_to_list(Value);
+convert(atom, _Key, Value) when is_list(Value) ->
+  list_to_atom(Value);
+convert(time, Key, Value) when is_list(Value) ->
+  parse_time(Key, Value);
 convert(time_infinity, Key, Value) when is_list(Value) ->
   parse_time(Key, Value);
 convert(integer, Key, Value) when is_list(Value) ->

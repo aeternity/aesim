@@ -90,18 +90,14 @@
 
 -spec parse_options(map(), map()) -> map().
 parse_options(Config, Opts) ->
-  NodeMod = maps:get(node_mod, Opts, ?DEFAULT_NODE_MOD),
-  PoolMod = maps:get(pool_mod, Opts, ?DEFAULT_POOL_MOD),
-  Config2 = Config#{
-    node_mod => NodeMod,
-    pool_mod => PoolMod
-  },
-  Parsers = [
-    fun NodeMod:parse_options/2,
-    fun PoolMod:parse_options/2,
-    fun aesim_connections:parse_options/2
-  ],
-  lists:foldl(fun(F, C) -> F(C, Opts) end, Config2, Parsers).
+  aesim_config:parse(Config, Opts, [
+    {node_mod, atom, ?DEFAULT_NODE_MOD},
+    {pool_mod, atom, ?DEFAULT_POOL_MOD}
+  ], [
+    fun aesim_connections:parse_options/2,
+    {node_mod, parse_options},
+    {pool_mod, parse_options}
+  ]).
 
 -spec new(id(), address_map(), sim()) -> {state(), sim()}.
 new(NodeId, CurrAddrs, Sim) ->

@@ -52,8 +52,11 @@
 
 -spec parse_options(map(), map()) -> map().
 parse_options(Config, Opts) ->
-  ConnMod = maps:get(conn_mod, Opts, ?DEFAULT_CONN_MOD),
-  ConnMod:parse_options(Config#{conn_mod => ConnMod}, Opts).
+  aesim_config:parse(Config, Opts, [
+    {conn_mod, atom, ?DEFAULT_CONN_MOD}
+  ], [
+    {conn_mod, parse_options}
+  ]).
 
 -spec new(context(), sim()) -> {state(), sim()}.
 new(_Context, Sim) ->
