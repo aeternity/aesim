@@ -49,7 +49,9 @@
 }.
 
 -type sim() :: #{
-  config := map(),
+  config := term(),
+  events := term(),
+  metrics := term(),
   real_start_time := real_time(),
   time := sim_time(),
   max_sim_time := sim_time() | infinity,
@@ -57,6 +59,5 @@
   progress_sim_time := sim_time(),
   progress_sim_interval := sim_time(),
   progress_real_time := real_time(),
-  progress_real_interval := real_time(),
-  events := term()
+  progress_real_interval := real_time()
 }.

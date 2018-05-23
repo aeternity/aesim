@@ -39,9 +39,9 @@
 
 %=== API FUNCTIONS =============================================================
 
--spec parse_options(map(), map()) -> map().
-parse_options(Config, Opts) ->
-  aesim_config:parse(Config, Opts, [
+-spec parse_options(map(), sim()) -> sim().
+parse_options(Opts, Sim) ->
+  aesim_config:parse(Sim, Opts, [
     {bootstrap_size, integer, ?DEFAULT_BOOTSTRAP_SIZE},
     {trusted_count, integer, ?DEFAULT_TRUSTED_COUNT}
   ], [
@@ -152,6 +152,6 @@ post(Delay, Name, Params, Sim) ->
 
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
-cfg_bootstrap_size(Config) -> aesim_config:get(Config, bootstrap_size).
+cfg_bootstrap_size(Sim) -> aesim_config:get(Sim, bootstrap_size).
 
-cfg_trusted_count(Config) -> aesim_config:get(Config, trusted_count).
+cfg_trusted_count(Sim) -> aesim_config:get(Sim, trusted_count).

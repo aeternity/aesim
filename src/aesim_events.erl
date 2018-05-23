@@ -30,6 +30,8 @@
   sched := gb_trees:tree(event_ref(), event())
 }.
 
+-export_type([state/0]).
+
 %=== API FUNCTIONS =============================================================
 
 -spec new() -> state().

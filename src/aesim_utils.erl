@@ -13,6 +13,7 @@
 -export([rand_take/1, rand_take/2]).
 -export([rand_pick/1, rand_pick/2, rand_pick/3]).
 -export([list_add_new/2]).
+-export([reduce_metric/1]).
 
 %=== API FUNCTIONS =============================================================
 
@@ -79,3 +80,20 @@ list_add_new(Value, List) ->
     false -> [Value | List];
     true -> List
   end.
+
+-spec reduce_metric([integer()]) -> {integer(), integer(), integer(), integer()}.
+reduce_metric([_|_] = Values) ->
+  {Total, Min, Max, Count} = lists:foldl(fun(V, {T, Mn, Mx, C}) ->
+    {T + V, safe_min(Mn, V), safe_max(Mx, V), C + 1}
+  end, {0, undefined, undefined, 0}, Values),
+  Avg = round(Total / Count),
+  Median = lists:nth(max(Count div 2, 1), lists:sort(Values)),
+  {Min, Avg, Median, Max}.
+
+%=== INTERNAL FUNCTIONS ========================================================
+
+safe_min(undefined, V) -> V;
+safe_min(V1, V2) -> min(V1, V2).
+
+safe_max(undefined, V) -> V;
+safe_max(V1, V2) -> max(V1, V2).

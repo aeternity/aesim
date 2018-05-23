@@ -15,7 +15,6 @@
 
 %=== TYPES =====================================================================
 
--type state() :: #{opt_name() => option()}.
 -type opt_name() :: atom().
 -type opt_type() :: string | integer | integer_infinity | atom | time | time_infinity.
 -type spec() :: {opt_name(), opt_type(), term()}.
@@ -24,40 +23,49 @@
 -type parser_def() :: {atom(), atom()} | fun((state(), map()) -> state()).
 -type parser_defs() :: [parser_def()].
 
+-type state() :: #{
+  opt_name() => option()
+}.
+
+-export_type([state/0]).
+
 %=== API FUNCTIONS =============================================================
 
 -spec new() -> state().
-new() -> #{}.
+new() ->
+  #{}.
 
--spec get(sim() | state(), opt_name()) -> term().
-get(#{config := Config}, Key) -> get(Config, Key);
-get(State, Key) ->
+-spec get(sim(), opt_name()) -> term().
+get(Sim, Key) ->
+  #{config := State} = Sim,
   case maps:find(Key, State) of
     error -> error({unknown_option, Key});
     {ok, {_, _, _, Value}} -> Value
   end.
 
--spec parse(state(), map(), specs()) -> state().
-parse(State, Opts, Specs) ->
-  parse(State, Opts, Specs, []).
+-spec parse(sim(), map(), specs()) -> sim().
+parse(Sim, Opts, Specs) ->
+  parse(Sim, Opts, Specs, []).
 
--spec parse(state(), map(), specs(), parser_defs()) -> state().
-parse(State, Opts, Specs, ParserFuns) ->
+-spec parse(sim(), map(), specs(), parser_defs()) -> sim().
+parse(Sim, Opts, Specs, ParserFuns) ->
+  #{config := State} = Sim,
   State2 = lists:foldl(fun
-    ({Key, Type, Default}, Cfg) ->
+    ({Key, Type, Default}, St) ->
       {IsDefault, Source, Value} = get_option(Opts, Key, Type, Default),
-      add_config(Cfg, Key, Type, IsDefault, Source, Value)
+      add_config(St, Key, Type, IsDefault, Source, Value)
   end, State, Specs),
+  Sim2 = Sim#{config := State2},
   lists:foldl(fun
-    (F, C) when is_function(F) -> F(C, Opts);
-    ({Key, FunName}, C) ->
-      Mod = get(C, Key),
-      Mod:FunName(C, Opts)
-  end, State2, ParserFuns).
+    (F, S) when is_function(F) -> F(Opts, S);
+    ({Key, FunName}, S) ->
+      Mod = get(S, Key),
+      Mod:FunName(Opts, S)
+  end, Sim2, ParserFuns).
 
--spec print_config(sim() | state()) -> ok.
-print_config(#{config := Config}) -> print_config(Config);
-print_config(State) ->
+-spec print_config(sim()) -> ok.
+print_config(Sim) ->
+  #{config := State} = Sim,
   lists:foreach(fun({N, {T, D, S, _}}) ->
     DefStr = if D -> "(default)"; true -> "" end,
     aesim_utils:print("~-20s: ~30s ~-17w ~9s~n", [N, S, T, DefStr])
@@ -87,7 +95,7 @@ convert(_Type, Key, "") -> error({bad_option, {Key, ""}});
 convert(atom, _Key, Value) when is_atom(Value) -> Value;
 convert(integer, _Key, Value) when is_integer(Value) -> Value;
 convert(integer_infinity, _Key, Value) when is_integer(Value) -> Value;
-convert(integer_infinity, _Key, infinity) -> infinit;
+convert(integer_infinity, _Key, infinity) -> infinity;
 convert(integer_infinity, _Key, "infinity") -> infinity;
 convert(time, _Key, Value) when is_integer(Value), Value >= 0 -> Value;
 convert(time_infinity, _Key, Value) when is_integer(Value), Value >= 0 -> Value;
@@ -103,7 +111,8 @@ convert(time, Key, Value) when is_list(Value) ->
   parse_time(Key, Value);
 convert(time_infinity, Key, Value) when is_list(Value) ->
   parse_time(Key, Value);
-convert(integer, Key, Value) when is_list(Value) ->
+convert(Type, Key, Value)
+ when is_list(Value), Type =:= integer orelse Type =:= integer_infinity  ->
   try
     list_to_integer(Value)
   catch

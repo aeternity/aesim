@@ -8,20 +8,26 @@
 %=== EXPORTS ===================================================================
 
 %% API functions
--export([parse_options/2]).
--export([new/2]).
--export([connect/4]).
--export([disconnect/4]).
--export([disconnect_peer/4]).
 -export([report/4]).
 
 %% API functions for callback modules
 -export([count/2]).
+-export([peers/2]).
 -export([status/2]).
 -export([type/2]).
 -export([peer/2]).
 -export([peer_connections/2]).
 -export([has_connection/2]).
+
+%% Internal API functions only used by aesim_node
+-export([parse_options/2]).
+-export([new/2]).
+-export([connect/4]).
+-export([disconnect/4]).
+-export([disconnect_peer/4]).
+-export([prepare_accept/6]).
+-export([commit_accept/4]).
+-export([commit_reject/4]).
 
 %% Event handling functions; only used by aesim_node
 -export([route_event/6]).
@@ -43,16 +49,25 @@
 -type state() :: #{
   connections := #{conn_ref() => connection()},
   peer_index := #{id() => #{conn_ref() => true}},
-  tag_indexes := #{atom() => #{id() => true}}
+  tag_indexes := #{atom() => #{conn_ref() => true}}
 }.
 
 -export_type([state/0]).
 
 %=== API FUNCTIONS =============================================================
 
--spec parse_options(map(), map()) -> map().
-parse_options(Config, Opts) ->
-  aesim_config:parse(Config, Opts, [
+-spec report(state(), report_type(), context(), sim()) -> map().
+report(State, _Type, _Context, _Sim) ->
+  #{peer_index := PeerIndex} = State,
+  #{outbound_count => count(State, [outbound]),
+    inbound_count => count(State, [inbound]),
+    peer_count => maps:size(PeerIndex)}.
+
+%--- INTERNAL API FUNCTIONS ----------------------------------------------------
+
+-spec parse_options(map(), sim()) -> sim().
+parse_options(Opts, Sim) ->
+  aesim_config:parse(Sim, Opts, [
     {conn_mod, atom, ?DEFAULT_CONN_MOD}
   ], [
     {conn_mod, parse_options}
@@ -72,9 +87,15 @@ new(_Context, Sim) ->
   },
   {State, Sim}.
 
--spec count(state(), conn_filter() | [conn_filter()]) -> pos_integer().
+-spec count(state(), all | conn_filter() | [conn_filter()]) -> pos_integer().
 count(State, Filters) ->
   maps:size(index_tags_get(State, Filters)).
+
+-spec peers(state(), all | conn_filter() | [conn_filter()]) -> [id()].
+peers(State, Filters) ->
+  #{connections := Conns} = State,
+  [maps:get(peer, maps:get(R, Conns))
+   || R <- maps:keys(index_tags_get(State, Filters))].
 
 -spec status(state(), conn_ref()) -> conn_status() | undefined.
 status(State, ConnRef) ->
@@ -111,11 +132,12 @@ has_connection(State, PeerId) ->
 -spec connect(state(), id(), context(), sim()) -> {state(), sim()}.
 connect(State, PeerId, Context, Sim) ->
   #{node_id := NodeId} = Context,
+  Sim2 = metrics_inc([connections, connect], Context, Sim),
   ConnRef = make_ref(),
-  {Conn, Sim2} = conn_new(ConnRef, PeerId, outbound, connecting, Context, Sim),
-  {Conn2, Delay, Opts, Sim3} = conn_connect(Conn, Context, Sim2),
-  {_, Sim4} = post_initiated(Delay, NodeId, PeerId, ConnRef, Opts, Sim3),
-  {add_connection(State, Conn2), Sim4}.
+  {Conn, Sim3} = conn_new(ConnRef, PeerId, outbound, connecting, Context, Sim2),
+  {Conn2, Delay, Opts, Sim4} = conn_connect(Conn, Context, Sim3),
+  {_, Sim5} = aesim_node:post_conn_initiated(Delay, PeerId, NodeId, ConnRef, Opts, Sim4),
+  {add_connection(State, Conn2), Sim5}.
 
 -spec disconnect(state(), conn_ref(), context(), sim()) -> {state(), sim()}.
 disconnect(State, ConnRef, Context, Sim) ->
@@ -123,8 +145,9 @@ disconnect(State, ConnRef, Context, Sim) ->
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
     {ok, Conn} ->
-      Sim2 = disconnect_effects(NodeId, Conn, Context, Sim),
-      {del_connection(State, ConnRef), Sim2}
+      Sim2 = metrics_inc([connections, disconnect], Context, Sim),
+      Sim3 = disconnect_effects(NodeId, Conn, Context, Sim2),
+      {del_connection(State, ConnRef), Sim3}
   end.
 
 -spec disconnect_peer(state(), id(), context(), sim()) -> {state(), sim()}.
@@ -134,23 +157,40 @@ disconnect_peer(State, PeerId, Context, Sim) ->
     [] -> {State, Sim};
     Conns ->
       Sim2 = lists:foldl(fun(C, S) ->
-        disconnect_effects(NodeId, C, Context, S)
+        S2 = metrics_inc([connections, disconnect], Context, S),
+        disconnect_effects(NodeId, C, Context, S2)
       end, Sim, Conns),
       {del_peer_connections(State, PeerId), Sim2}
   end.
 
--spec report(state(), report_type(), context(), sim()) -> map().
-report(State, _Type, _Context, _Sim) ->
-  #{peer_index := PeerIndex} = State,
-  #{outbound_count => count(State, [outbound]),
-    inbound_count => count(State, [inbound]),
-    peer_count => maps:size(PeerIndex)}.
+-spec prepare_accept(state(), id(), conn_ref(), term(), context(), sim())
+  -> {accept, state(), term(), sim()} | {reject, state(), sim()}.
+prepare_accept(State, PeerId, ConnRef, Opts, Context, Sim) ->
+  {Conn, Sim2} = conn_new(ConnRef, PeerId, inbound, connected, Context, Sim),
+  case conn_accept(Conn, Opts, Context, Sim2) of
+    {reject, Delay, Sim2} ->
+      {_, Sim3} = post_rejected(Delay, PeerId, ConnRef, Sim2),
+      {reject, State, Sim3};
+    {accept, Conn2, Delay, Sim2} ->
+      {accept, State, {Conn2, Delay}, Sim2}
+  end.
+
+-spec commit_accept(state(), term(), context(), sim()) -> {state(), sim()}.
+commit_accept(State, {Conn, Delay}, _Context, Sim) ->
+  #{peer := PeerId, ref := ConnRef} = Conn,
+  {_, Sim2} = post_accepted(Delay, PeerId, ConnRef, Sim),
+  {add_connection(State, Conn), Sim2}.
+
+-spec commit_reject(state(), term(), context(), sim()) -> {state(), sim()}.
+commit_reject(State, {Conn, _Delay}, Context, Sim) ->
+  #{peer := PeerId, ref := ConnRef} = Conn,
+  {Delay, Sim2} = conn_reject(Conn, Context, Sim),
+  {_, Sim3} = post_rejected(Delay, PeerId, ConnRef, Sim2),
+  {State, Sim3}.
 
 %--- PUBLIC EVENT FUNCTIONS ----------------------------------------------------
 
 -spec route_event(state(), event_addr(), event_name(), term(), context(), sim()) -> {state(), sim()}.
-route_event(State, [], initiated, {PeerId, ConnRef, Opts}, Context, Sim) ->
-  on_initiated(State, PeerId, ConnRef, Opts, Context, Sim);
 route_event(State, [], accepted, ConnRef, Context, Sim) ->
   on_accepted(State, ConnRef, Context, Sim);
 route_event(State, [], rejected, ConnRef, Context, Sim) ->
@@ -167,6 +207,10 @@ route_event(State, Addr, Name, Params, Context, Sim) ->
 
 %=== INTERNAL FUNCTIONS ========================================================
 
+metrics_inc(Name, Context, Sim) ->
+  #{node_id := NodeId} = Context,
+  aesim_metrics:inc(NodeId, Name, 1, Sim).
+
 get_connection(State, ConnRef) ->
   #{connections := Conns} = State,
   maps:find(ConnRef, Conns).
@@ -176,6 +220,7 @@ get_peer_connections(State, PeerId) ->
   ConnRefs = maps:keys(index_peers_get(State, PeerId)),
   maps:values(maps:with(ConnRefs, Conns)).
 
+% Connection status and type shouldn't be changed; this doesn't update the index
 set_connection(State, Conn) ->
   #{connections := Conns} = State,
   #{ref := ConnRef} = Conn,
@@ -217,16 +262,13 @@ disconnect_effects(NodeId, Conn, Context, Sim) ->
   #{ref := ConnRef, type := ConnType, peer := PeerId} = Conn,
   {Delay, Sim2} = conn_disconnect(Conn, Context, Sim),
   {_, Sim3} = post_closed(Delay, PeerId, ConnRef, Sim2),
-  {_, Sim4} = aesim_node:post_conn_closed(0, NodeId, PeerId, ConnRef, ConnType, Sim3),
+  {_, Sim4} = aesim_node:post_conn_terminated(0, NodeId, PeerId, ConnRef, ConnType, Sim3),
   Sim4.
 
 %--- PRIVATE EVENT FUNCTIONS ---------------------------------------------------
 
 post(Delay, NodeId, Name, Params, Sim) ->
   aesim_events:post(Delay, [nodes, NodeId, connections], Name, Params, Sim).
-
-post_initiated(Delay, NodeId, PeerId, ConnRef, Opts, Sim) ->
-  post(Delay, PeerId, initiated, {NodeId, ConnRef, Opts}, Sim).
 
 post_closed(Delay, PeerId, ConnRef, Sim) ->
   post(Delay, PeerId, closed, ConnRef, Sim).
@@ -249,17 +291,6 @@ handle_conn_event(State, ConnRef, Name, Params, Context, Sim) ->
         {Conn2, Sim2} -> {set_connection(State, Conn2), Sim2};
         ignore -> {State, Sim}
       end
-  end.
-
-on_initiated(State, PeerId, ConnRef, Opts, Context, Sim) ->
-  {Conn, Sim2} = conn_new(ConnRef, PeerId, inbound, connected, Context, Sim),
-  case conn_accept(Conn, Opts, Context, Sim2) of
-    {reject, Delay, Sim2} ->
-      {_, Sim3} = post_rejected(Delay, PeerId, ConnRef, Sim2),
-      {State, Sim3};
-    {accept, Conn2, Delay, Sim2} ->
-      {_, Sim3} = post_accepted(Delay, PeerId, ConnRef, Sim2),
-      {add_connection(State, Conn2), Sim3}
   end.
 
 on_accepted(State, ConnRef, Context, Sim) ->
@@ -286,7 +317,7 @@ on_closed(State, ConnRef, Context, Sim) ->
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
     {ok, #{peer := PeerId, type := ConnType}} ->
-      {_, Sim2} = aesim_node:post_conn_closed(0, NodeId, PeerId, ConnRef, ConnType, Sim),
+      {_, Sim2} = aesim_node:post_conn_terminated(0, NodeId, PeerId, ConnRef, ConnType, Sim),
       {del_connection(State, ConnRef), Sim2}
   end.
 
@@ -404,6 +435,12 @@ conn_accept(Conn, Opts, Context, Sim) ->
       {accept, Conn#{sub := Sub2}, Delay, Sim2}
   end.
 
+conn_reject(Conn, Context, Sim) ->
+  ConnContext = conn_context(Context, Conn),
+  #{sub := Sub} = Conn,
+  ConnMod = cfg_conn_mod(Sim),
+  ConnMod:conn_reject(Sub, ConnContext, Sim).
+
 conn_disconnect(Conn, Context, Sim) ->
   ConnContext = conn_context(Context, Conn),
   #{sub := Sub} = Conn,
@@ -421,4 +458,4 @@ conn_handle_event(Conn, Name, Params, Context, Sim) ->
 
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
-cfg_conn_mod(Config) -> aesim_config:get(Config, conn_mod).
+cfg_conn_mod(Sim) -> aesim_config:get(Sim, conn_mod).

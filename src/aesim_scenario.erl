@@ -7,10 +7,10 @@
 
 %=== BEHAVIOUR DEFINITION ======================================================
 
--callback parse_options(Config, Opts)
-  -> Config
-  when Config :: map(),
-       Opts :: map().
+-callback parse_options(Opts, Sim)
+  -> Sim
+  when Opts :: map(),
+       Sim :: sim().
 
 -callback scenario_new(Sim)
   -> {State, Sim}
@@ -38,7 +38,7 @@
 -callback scenario_report(State, Reason, Nodes, Sim)
   -> ok
   when State :: term(),
-       Reason :: timeout | frozen,
+       Reason :: termination_reason(),
        Nodes :: aesim_nodes:state(),
        Sim :: sim().
 
@@ -58,8 +58,10 @@
 -export([print_header/1]).
 -export([print_fields/2]).
 -export([calculate_progress/1]).
--export([node_metrics/2]).
--export([reduce_metric/1]).
+-export([nodes_status/2]).
+-export([default_start/2]).
+-export([default_progress/2]).
+-export([default_report/3]).
 
 %=== MACROS ====================================================================
 
@@ -67,9 +69,27 @@
 -define(PREFIX_SIZE, 3).
 -define(HEADER_CHAR, $#).
 -define(NO_SPACE_CHAR, $*).
+-define(PROGRESS_SPECS, [
+  {integer, "PROGRESS", right, "%", 8},
+  {time, "REAL-TIME", right, undefined, 13},
+  {time, "SIM-TIME", right, undefined, 13},
+  {speed, "CURR-SPEED", right, "x", 10},
+  {speed, "GLOB-SPEED", right, "x", 10},
+  {integer, "NODES", right, undefined, 5},
+  {integer, "CONNS", right, undefined, 7},
+  {integer, "EVENTS", right, undefined, 7}
+]).
+-define(METRIC_SPECS, [
+  {string, "DESCRIPTION", left, undefined, 48},
+  {integer, "MINIMUM", right, undefined, 7},
+  {integer, "AVERAGE", right, undefined, 7},
+  {integer, "MEDIAN", right, undefined, 7},
+  {integer, "MAXIMUM", right, undefined, 7}
+]).
 
 %=== TYPES =====================================================================
 
+-type termination_reason() :: timeout | frozen.
 -type print_type() :: string | integer | time | speed.
 -type print_just() :: left | right.
 -type print_spec() :: {print_type(), string(), print_just(), string() | undefined, pos_integer()}.
@@ -123,7 +143,7 @@ calculate_progress(Sim) ->
     global_speed => SimProgress / (RealProgress - RealStartTime)
   }.
 
-node_metrics(Nodes, Sim) ->
+nodes_status(Nodes, Sim) ->
   #{nodes := NodeReports} = aesim_nodes:report(Nodes, complete, Sim),
   NodeCount = aesim_nodes:count(Nodes),
   {IcValues, OcValues, KcValues, KpValues, VcValues, VpValues}
@@ -142,29 +162,61 @@ node_metrics(Nodes, Sim) ->
        [Kp | KpAcc], [Vc | VcAcc], [Vp | VpAcc]}
     end, {[], [], [], [], [], []}, NodeReports),
   [
-    {"Inbound connections", reduce_metric(IcValues)},
-    {"Outbound connections", reduce_metric(OcValues)},
-    {"Known peers", reduce_metric(KcValues)},
-    {"Known peers (%)", reduce_metric(KpValues)},
-    {"Pooled verified peers", reduce_metric(VcValues)},
-    {"Pooled verified peers (%)", reduce_metric(VpValues)}
+    {"Inbound connections", aesim_utils:reduce_metric(IcValues)},
+    {"Outbound connections", aesim_utils:reduce_metric(OcValues)},
+    {"Known peers", aesim_utils:reduce_metric(KcValues)},
+    {"Known peers (%)", aesim_utils:reduce_metric(KpValues)},
+    {"Pooled verified peers", aesim_utils:reduce_metric(VcValues)},
+    {"Pooled verified peers (%)", aesim_utils:reduce_metric(VpValues)}
   ].
 
-reduce_metric([_|_] = Values) ->
-  {Total, Min, Max, Count} = lists:foldl(fun(V, {T, Mn, Mx, C}) ->
-    {T + V, safe_min(Mn, V), safe_max(Mx, V), C + 1}
-  end, {0, undefined, undefined, 0}, Values),
-  Avg = round(Total / Count),
-  Median = lists:nth(max(Count div 2, 1), lists:sort(Values)),
-  {Min, Avg, Median, Max}.
+-spec default_start(aesim_nodes:state(), sim()) -> {aesim_nodes:state(), sim()}.
+default_start(Nodes, Sim) ->
+  {Nodes2, Sim2} = aesim_nodes:bootstrap(Nodes, Sim),
+  print_title("CONFIGURATION"),
+  aesim_config:print_config(Sim2),
+  print_title("SIMULATION"),
+  print_header(?PROGRESS_SPECS),
+  {Nodes2, Sim2}.
+
+-spec default_progress(aesim_nodes:state(), sim()) -> ok.
+default_progress(Nodes, Sim) ->
+  EventCount = aesim_events:size(Sim),
+  #{progress := Progress,
+    real_time := RealTime,
+    sim_time := SimTime,
+    current_speed := CurrSpeed,
+    global_speed := GlobSpeed
+  } = calculate_progress(Sim),
+  #{node_count := NodeCount,
+    connection_count := ConnCount
+  } = aesim_nodes:report(Nodes, simple, Sim),
+  Fields = [Progress, RealTime, SimTime, CurrSpeed, GlobSpeed,
+            NodeCount, ConnCount, EventCount],
+  print_fields(?PROGRESS_SPECS, Fields).
+
+-spec default_report(termination_reason(), aesim_nodes:state(), sim()) -> ok.
+default_report(_Reason, Nodes, Sim) ->
+  print_title("EVENTS STATUS"),
+  aesim_events:print_summary(Sim),
+  print_title("NODES STATUS"),
+  print_header(?METRIC_SPECS),
+  lists:foreach(fun({Desc, {Min, Avg, Med, Max}}) ->
+    Fields = [Desc, Min, Avg, Med, Max],
+    print_fields(?METRIC_SPECS, Fields)
+  end, nodes_status(Nodes, Sim)),
+  print_title("NODES METRICS"),
+  print_header(?METRIC_SPECS),
+  SortedMetrics = lists:keysort(1, aesim_metrics:collect_nodes_metrics(Sim)),
+  lists:foreach(fun({Name, {Min, Avg, Med, Max}}) ->
+    Desc = aesim_metrics:name_to_list(Name),
+    Fields = [Desc, Min, Avg, Med, Max],
+    print_fields(?METRIC_SPECS, Fields)
+  end, SortedMetrics),
+  print_separator(),
+  ok.
 
 %=== INTERNAL FUNCTIONS ========================================================
-
-safe_min(undefined, V) -> V;
-safe_min(V1, V2) -> min(V1, V2).
-
-safe_max(undefined, V) -> V;
-safe_max(V1, V2) -> max(V1, V2).
 
 header_print_params(Specs) ->
   header_print_params(Specs, [], []).

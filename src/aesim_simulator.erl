@@ -33,25 +33,30 @@
 -spec run(map()) -> ok.
 run(Opts)->
   lager:info("Starting simulator..."),
-  Config = parse_options(Opts),
   StartTime = erlang:system_time(millisecond),
   Sim = #{
-    config => Config,
+    config => aesim_config:new(),
+    events => aesim_events:new(),
+    metrics => aesim_metrics:new(),
     real_start_time => StartTime,
     time => 0,
-    max_real_time => cfg_max_real_time(Config),
-    max_sim_time => cfg_max_sim_time(Config),
+    max_real_time => infinity,
+    max_sim_time => infinity,
     progress_sim_time => 0,
     progress_sim_interval => 0,
     progress_real_time => StartTime,
-    progress_real_interval => 0,
-    events => aesim_events:new()
+    progress_real_interval => 0
   },
-  {Nodes, Sim2} = nodes_new(Sim),
-  {Scenario, Sim3} = scenario_new(Sim2),
+  Sim2 = parse_options(Opts, Sim),
+  Sim3 = Sim2#{
+    max_real_time => cfg_max_real_time(Sim2),
+    max_sim_time => cfg_max_sim_time(Sim2)
+  },
+  {Nodes, Sim4} = nodes_new(Sim3),
+  {Scenario, Sim5} = scenario_new(Sim4),
   State = #{nodes => Nodes, scenario => Scenario},
-  {State2, Sim4} = scenario_start(State, Sim3),
-  loop(State2, Sim4).
+  {State2, Sim6} = scenario_start(State, Sim5),
+  loop(State2, Sim6).
 
 %=== INTERNAL FUNCTIONS ========================================================
 
@@ -173,8 +178,8 @@ scenario_handle_event(State, Name, Params, Sim) ->
 
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
-parse_options(Opts) ->
-  aesim_config:parse(aesim_config:new(), Opts, [
+parse_options(Opts, Sim) ->
+  aesim_config:parse(Sim, Opts, [
     {scenario_mod, atom, ?DEFAULT_SCENARIO_MOD},
     {progress_interval, time, ?DEFAULT_PROGRESS_INTERVAL},
     {max_sim_time, time_infinity, ?DEFAULT_MAX_SIM_TIME},
@@ -184,11 +189,11 @@ parse_options(Opts) ->
     fun aesim_nodes:parse_options/2
   ]).
 
-cfg_max_real_time(Config) -> aesim_config:get(Config, max_real_time).
+cfg_max_real_time(Sim) -> aesim_config:get(Sim, max_real_time).
 
-cfg_max_sim_time(Config) -> aesim_config:get(Config, max_sim_time).
+cfg_max_sim_time(Sim) -> aesim_config:get(Sim, max_sim_time).
 
-cfg_scenario_mod(Config) -> aesim_config:get(Config, scenario_mod).
+cfg_scenario_mod(Sim) -> aesim_config:get(Sim, scenario_mod).
 
-cfg_progress_interval(Config) -> aesim_config:get(Config, progress_interval).
+cfg_progress_interval(Sim) -> aesim_config:get(Sim, progress_interval).
 
