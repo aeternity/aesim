@@ -34,6 +34,7 @@ new() ->
   #{nodes => #{}}.
 
 -spec inc(id(), metric_name(), integer(), sim()) -> sim().
+inc(_NodeId, _Name, 0, Sim) -> Sim;
 inc(NodeId, Name, Inc, Sim) ->
   #{metrics := State} = Sim,
   #{nodes := NodesMetrics} = State,

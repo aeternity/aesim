@@ -4,7 +4,7 @@
 %%  - Connects to all trusted peers at startup.
 %%  - Connects to identified peers with configurable period.
 %%  - Prunes node connections based on node id; it keeps outbound connection
-%%  from the peer with bigger id.
+%%  from the peer with smaller `md5(id)` (for better distribution).
 %%  - Send gossip pings periodically.
 %%  - Handle gossip ping responses.
 %%  - Optionally limites the number of inbound/outbound connections.
@@ -134,8 +134,8 @@ select_connection(NodeId, PeerId, ConnRefs, Conns) ->
   %% Keep one of the connections initiated by the node with biggest id
   Initiatores = lists:map(fun(ConnRef) ->
     case aesim_connections:type(Conns, ConnRef) of
-      outbound -> {-NodeId, ConnRef};
-      inbound -> {-PeerId, ConnRef}
+      outbound -> {crypto:hash(md5, integer_to_list(NodeId)), ConnRef};
+      inbound -> {crypto:hash(md5, integer_to_list(PeerId)), ConnRef}
     end
   end, ConnRefs),
   [{_, SelRef} | Rest] = lists:keysort(1, Initiatores),
@@ -147,10 +147,11 @@ prune_connections(State, PeerId, ConnRef, Context, Sim) ->
     [_] -> {continue, State, Sim};
     ConnRefs ->
       {SelRef, OtherRefs} = select_connection(NodeId, PeerId, ConnRefs, Conns),
-      {_, Sim2} = aesim_node:async_disconnect(NodeId, OtherRefs, Sim),
+      Sim2 = aesim_metrics:inc(NodeId, [connections, pruned], length(OtherRefs), Sim),
+      {_, Sim3} = aesim_node:async_disconnect(NodeId, OtherRefs, Sim2),
       case SelRef =:= ConnRef of
-        true -> {continue, State, Sim2};
-        false -> {abort, State, Sim2}
+        true -> {continue, State, Sim3};
+        false -> {abort, State, Sim3}
       end
   end.
 
