@@ -1,0 +1,48 @@
+version: 2
+
+references:
+  container_config: &container_config
+    docker:
+      - image: aeternity/builder
+        user: builder
+    working_directory: ~/epoch
+
+  build_cache_key: &build_cache_key build-cache-v1-{{ .Revision }}
+  restore_build_cache: &restore_build_cache
+    restore_cache:
+      key: *build_cache_key
+
+jobs:
+  build:
+    <<: *container_config
+    steps:
+      - checkout
+      - run:
+          name: Retrieve rebar3
+          command: curl -fsSLO https://github.com/erlang/rebar3/releases/download/3.5.3/rebar3 && chmod +x rebar3
+      - run:
+          name: Build
+          command: ./rebar3 escriptize
+      - save_cache:
+          key: *build_cache_key
+          paths:
+            - "_build"
+
+  test:
+    <<: *container_config
+    steps:
+      - checkout
+      - *restore_build_cache
+      - run:
+          name: Smoke test
+          command: _build/default/bin/aesim max_real_time=1m
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - build: {}
+
+      - test:
+          requires:
+            - build
