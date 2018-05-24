@@ -6,7 +6,6 @@
 
 %=== EXPORTS ===================================================================
 
--export([print/2]).
 -export([format/2]).
 -export([format_time/1]).
 -export([rand/1, rand/2]).
@@ -16,10 +15,6 @@
 -export([reduce_metric/1]).
 
 %=== API FUNCTIONS =============================================================
-
--spec print(string(), [term()]) -> ok.
-print(Format, Params) ->
-  io:format(Format, Params).
 
 -spec format(string(), [term()]) -> string().
 format(Format, Params) ->

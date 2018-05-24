@@ -8,9 +8,12 @@
 %=== EXPORTS ===================================================================
 
 -export([run/1]).
+-export([print/3]).
 
 %=== MACROS ====================================================================
 
+-define(SIMULATIONS_DIR, "simulations").
+-define(REPORT_FILENAME, "report.txt").
 -define(DEFAULT_MAX_SIM_TIME,                        "2h").
 -define(DEFAULT_MAX_REAL_TIME,                   infinity).
 -define(DEFAULT_SCENARIO_MOD,      aesim_scenario_default).
@@ -38,6 +41,8 @@ run(Opts)->
     config => aesim_config:new(),
     events => aesim_events:new(),
     metrics => aesim_metrics:new(),
+    sim_dir => undefined,
+    report_file => undefined,
     real_start_time => StartTime,
     time => 0,
     max_real_time => infinity,
@@ -47,18 +52,44 @@ run(Opts)->
     progress_real_time => StartTime,
     progress_real_interval => 0
   },
-  Sim2 = parse_options(Opts, Sim),
-  Sim3 = Sim2#{
-    max_real_time => cfg_max_real_time(Sim2),
-    max_sim_time => cfg_max_sim_time(Sim2)
-  },
-  {Nodes, Sim4} = nodes_new(Sim3),
-  {Scenario, Sim5} = scenario_new(Sim4),
+  Sim2 = setup_simulation(Opts, Sim),
+  {Nodes, Sim3} = nodes_new(Sim2),
+  {Scenario, Sim4} = scenario_new(Sim3),
   State = #{nodes => Nodes, scenario => Scenario},
-  {State2, Sim6} = scenario_start(State, Sim5),
-  loop(State2, Sim6).
+  {State2, Sim5} = scenario_start(State, Sim4),
+  try loop(State2, Sim5)
+  after
+    cleanup_simulation(Sim5)
+  end.
+
+-spec print(string(), [term()], sim()) -> ok.
+print(Format, Params, #{report_file := undefined}) ->
+  io:format(Format, Params);
+print(Format, Params, #{report_file := ReportFile}) ->
+  file:write(ReportFile, io_lib:format(Format, Params)),
+  io:format(Format, Params).
 
 %=== INTERNAL FUNCTIONS ========================================================
+
+setup_simulation(Opts, Sim) ->
+  Sim2 = parse_options(Opts, Sim),
+  SimSubDir = simulation_dir(Sim2),
+  {ok, WorkingDir} = file:get_cwd(),
+  SimPath = filename:join(WorkingDir, SimSubDir),
+  ReportPath = filename:join(SimPath, ?REPORT_FILENAME),
+  ok = filelib:ensure_dir(ReportPath),
+  {ok, ReportFile} = file:open(ReportPath, [raw, write]),
+  Sim2#{
+    max_real_time => cfg_max_real_time(Sim2),
+    max_sim_time => cfg_max_sim_time(Sim2),
+    sim_dir := SimPath,
+    report_file := ReportFile
+  }.
+
+
+cleanup_simulation(#{report_file := undefined}) -> ok;
+cleanup_simulation(#{report_file := ReportFile}) ->
+  file:close(ReportFile).
 
 -spec loop(state(), sim()) -> ok.
 loop(State, Sim) ->
@@ -69,8 +100,8 @@ loop(State, Sim) ->
     false ->
       {State2, Sim2} = progress(State, RealNow, Sim),
       case aesim_events:next(Sim2) of
-        empty ->
-          scenario_report(State2, frozen, Sim2);
+        {empty, Sim3} ->
+          scenario_report(State2, frozen, Sim3);
         {NextTime, EAddr, EName, Params, Sim3} ->
           Sim4 = update_time(NextTime, Sim3),
           {State3, Sim5} = route_event(State2, EAddr, EName, Params, Sim4),
@@ -119,6 +150,15 @@ route_event(State, [nodes | Rest], Name, Params, Sim) ->
 route_event(State, Addr, Name, Params, Sim) ->
   lager:warning("Unexpected simulator event ~p for ~p: ~p", [Name, Addr, Params]),
   {State, Sim}.
+
+simulation_dir(Sim) ->
+  #{real_start_time := T} = Sim,
+  Now = {T div 1000000000, (T div 1000) rem 1000000  , (T rem 1000) * 1000},
+  {{Y, Mo, D}, {H, Mn, S}} = calendar:now_to_local_time(Now),
+  Milli = T rem 1000,
+  SubDir = aesim_utils:format("~4.10.0b~2.10.0b~2.10.0b~2.10.0b~2.10.0b~2.10.0b~3.10.0b",
+                              [Y, Mo, D, H, Mn, S, Milli]),
+  filename:join(?SIMULATIONS_DIR, SubDir).
 
 %--- NODES FUNCTIONS -----------------------------------------------------------
 

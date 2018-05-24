@@ -58,7 +58,8 @@ scenario_progress(State, Nodes, Sim) ->
   {State, Sim}.
 
 scenario_report(_State, Reason, Nodes, Sim) ->
-  aesim_scenario:default_report(Reason, Nodes, Sim).
+  aesim_scenario:default_report(Reason, Nodes, Sim),
+  aesim_scenario:print_separator(Sim).
 
 scenario_handle_event(State, start_node, Count, Nodes, Sim) ->
   do_start_node(State, Count, Nodes, Sim);

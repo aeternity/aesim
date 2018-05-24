@@ -68,7 +68,7 @@ print_config(Sim) ->
   #{config := State} = Sim,
   lists:foreach(fun({N, {T, D, S, _}}) ->
     DefStr = if D -> "(default)"; true -> "" end,
-    aesim_utils:print("~-20s: ~30s ~-17w ~9s~n", [N, S, T, DefStr])
+    aesim_simulator:print("~-20s: ~30s ~-17w ~9s~n", [N, S, T, DefStr], Sim)
   end, lists:keysort(1, maps:to_list(State))).
 
 %=== INTERNAL FUNCTIONS ========================================================

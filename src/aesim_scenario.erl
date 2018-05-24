@@ -53,10 +53,10 @@
 %=== EXPORTS ===================================================================
 
 -export([post/4]).
--export([print_separator/0]).
--export([print_title/1]).
--export([print_header/1]).
--export([print_fields/2]).
+-export([print_separator/1]).
+-export([print_title/2]).
+-export([print_header/2]).
+-export([print_fields/3]).
 -export([calculate_progress/1]).
 -export([nodes_status/2]).
 -export([default_start/2]).
@@ -101,26 +101,26 @@
 post(Delay, Name, Params, Sim) ->
   aesim_events:post(Delay, [scenario], Name, Params, Sim).
 
--spec print_separator() -> ok.
-print_separator() ->
-  aesim_utils:print("~s~n", [lists:duplicate(?LINE_LENGTH, ?HEADER_CHAR)]).
+-spec print_separator(sim()) -> ok.
+print_separator(Sim) ->
+  aesim_simulator:print("~s~n", [lists:duplicate(?LINE_LENGTH, ?HEADER_CHAR)], Sim).
 
--spec print_title(string()) -> ok.
-print_title(Title) ->
+-spec print_title(string(), sim()) -> ok.
+print_title(Title, Sim) ->
   Prefix = lists:duplicate(?PREFIX_SIZE, ?HEADER_CHAR),
   PostfixSize = ?LINE_LENGTH - (length(Title) + 2 + length(Prefix)),
   Postfix = lists:duplicate(PostfixSize, ?HEADER_CHAR),
-  aesim_utils:print("~s ~s ~s~n", [Prefix, Title, Postfix]).
+  aesim_simulator:print("~s ~s ~s~n", [Prefix, Title, Postfix], Sim).
 
--spec print_header(print_specs()) -> ok.
-print_header(Specs) ->
+-spec print_header(print_specs(), sim()) -> ok.
+print_header(Specs, Sim) ->
   {Format, Values} = header_print_params(Specs),
-  aesim_utils:print(Format, Values).
+  aesim_simulator:print(Format, Values, Sim).
 
--spec print_fields(print_specs(), [term()]) -> ok.
-print_fields(Specs, Fields) ->
+-spec print_fields(print_specs(), [term()], sim()) -> ok.
+print_fields(Specs, Fields, Sim) ->
   {Format, Values} = fields_print_params(Specs, Fields),
-  aesim_utils:print(Format, Values).
+  aesim_simulator:print(Format, Values, Sim).
 
 -spec calculate_progress(sim()) -> map().
 calculate_progress(Sim) ->
@@ -173,10 +173,10 @@ nodes_status(Nodes, Sim) ->
 -spec default_start(aesim_nodes:state(), sim()) -> {aesim_nodes:state(), sim()}.
 default_start(Nodes, Sim) ->
   {Nodes2, Sim2} = aesim_nodes:bootstrap(Nodes, Sim),
-  print_title("CONFIGURATION"),
+  print_title("CONFIGURATION", Sim2),
   aesim_config:print_config(Sim2),
-  print_title("SIMULATION"),
-  print_header(?PROGRESS_SPECS),
+  print_title("SIMULATION", Sim2),
+  print_header(?PROGRESS_SPECS, Sim2),
   {Nodes2, Sim2}.
 
 -spec default_progress(aesim_nodes:state(), sim()) -> ok.
@@ -193,27 +193,26 @@ default_progress(Nodes, Sim) ->
   } = aesim_nodes:report(Nodes, simple, Sim),
   Fields = [Progress, RealTime, SimTime, CurrSpeed, GlobSpeed,
             NodeCount, ConnCount, EventCount],
-  print_fields(?PROGRESS_SPECS, Fields).
+  print_fields(?PROGRESS_SPECS, Fields, Sim).
 
 -spec default_report(termination_reason(), aesim_nodes:state(), sim()) -> ok.
 default_report(_Reason, Nodes, Sim) ->
-  print_title("EVENTS STATUS"),
+  print_title("EVENTS STATUS", Sim),
   aesim_events:print_summary(Sim),
-  print_title("NODES STATUS"),
-  print_header(?METRIC_SPECS),
+  print_title("NODES STATUS", Sim),
+  print_header(?METRIC_SPECS, Sim),
   lists:foreach(fun({Desc, {Min, Avg, Med, Max}}) ->
     Fields = [Desc, Min, Avg, Med, Max],
-    print_fields(?METRIC_SPECS, Fields)
+    print_fields(?METRIC_SPECS, Fields, Sim)
   end, nodes_status(Nodes, Sim)),
-  print_title("NODES METRICS"),
-  print_header(?METRIC_SPECS),
+  print_title("NODES METRICS", Sim),
+  print_header(?METRIC_SPECS, Sim),
   SortedMetrics = lists:keysort(1, aesim_metrics:collect_nodes_metrics(Sim)),
   lists:foreach(fun({Name, {Min, Avg, Med, Max}}) ->
     Desc = aesim_metrics:name_to_list(Name),
     Fields = [Desc, Min, Avg, Med, Max],
-    print_fields(?METRIC_SPECS, Fields)
+    print_fields(?METRIC_SPECS, Fields, Sim)
   end, SortedMetrics),
-  print_separator(),
   ok.
 
 %=== INTERNAL FUNCTIONS ========================================================
