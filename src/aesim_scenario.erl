@@ -187,40 +187,47 @@ print_node_status(Nodes, Sim) ->
 print_oulier_info(Nodes, Sim) ->
   aesim_simulator:print_title("OUTLIER INFORMATION", Sim),
   TrustedIds = [I || {I, _} <- aesim_nodes:trusted(Nodes)],
-  NodeInfo = fun(Id) ->
+
+  NodeInfoFun = fun(Id) ->
     case lists:member(Id, TrustedIds) of
       true -> " (trusted)";
       false -> ""
     end
   end,
+
+  PrintNodesFun = fun(Selection, Idx, Factor, Unit) ->
+    lists:foreach(fun({NodeId, _, _, _} = Record) ->
+    Value = element(Idx, Record),
+    Info = NodeInfoFun(NodeId),
+    aesim_simulator:print("  Node ~4b: ~5b ~s~s~n",
+                          [NodeId, Factor * Value, Unit, Info], Sim)
+    end, Selection)
+  end,
+
   {MinData, MaxData} = aesim_nodes:reduce(Nodes,fun(I, N, {MinAcc, MaxAcc}) ->
     Conns = aesim_node:connections(N),
-    OutConnCount = aesim_connections:count(Conns, outbound),
-    InConnCount = aesim_connections:count(Conns, inbound),
-    {[{I, OutConnCount, InConnCount} | MinAcc],
-     [{I, -OutConnCount, -InConnCount} | MaxAcc]}
+    Pool = aesim_node:pool(N),
+    CO = aesim_connections:count(Conns, outbound),
+    CI = aesim_connections:count(Conns, inbound),
+    PV = aesim_pool:count(Pool, verified),
+    {[{I, CO, CI, PV} | MinAcc], [{I, -CO, -CI, -PV} | MaxAcc]}
   end, {[], []}),
-  {MaxOuts, _} = lists:split(?OUTLIER_COUNT, lists:keysort(2, MaxData)),
-  {MinOuts, _} = lists:split(?OUTLIER_COUNT, lists:keysort(2, MinData)),
-  {MaxIns, _} = lists:split(?OUTLIER_COUNT, lists:keysort(3, MaxData)),
-  {MinIns, _} = lists:split(?OUTLIER_COUNT, lists:keysort(3, MinData)),
+  {MaxCOs, _} = lists:split(?OUTLIER_COUNT, lists:keysort(2, MaxData)),
+  {MinCOs, _} = lists:split(?OUTLIER_COUNT, lists:keysort(2, MinData)),
+  {MaxCIs, _} = lists:split(?OUTLIER_COUNT, lists:keysort(3, MaxData)),
+  {MinCIs, _} = lists:split(?OUTLIER_COUNT, lists:keysort(3, MinData)),
+  {MaxPVs, _} = lists:split(?OUTLIER_COUNT, lists:keysort(4, MaxData)),
+  {MinPVs, _} = lists:split(?OUTLIER_COUNT, lists:keysort(4, MinData)),
   aesim_simulator:print("Nodes with the MOST outbound connections:~n", [], Sim),
-  lists:foreach(fun({NodeId, Value, _}) ->
-    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
-                          [NodeId, -Value, NodeInfo(NodeId)], Sim)
-  end, MaxOuts),
+  PrintNodesFun(MaxCOs, 2, -1, "connection(s)"),
   aesim_simulator:print("Nodes with the LESS outbound connections:~n", [], Sim),
-  lists:foreach(fun({NodeId, Value, _}) ->
-    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
-                          [NodeId, Value, NodeInfo(NodeId)], Sim)
-  end, MinOuts),
+  PrintNodesFun(MinCOs, 2, 1, "connection(s)"),
   aesim_simulator:print("Nodes with the MOST inbound connections:~n", [], Sim),
-  lists:foreach(fun({NodeId, _, Value}) ->
-    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
-                          [NodeId, -Value, NodeInfo(NodeId)], Sim)
-  end, MaxIns),
+  PrintNodesFun(MaxCIs, 3, -1, "connection(s)"),
   aesim_simulator:print("Nodes with the LESS inbound connections:~n", [], Sim),
-  lists:foreach(fun({NodeId, _, Value}) ->
-    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
-                          [NodeId, Value, NodeInfo(NodeId)], Sim)
-  end, MinIns).
+  PrintNodesFun(MinCIs, 3, 1, "connection(s)"),
+  aesim_simulator:print("Nodes with the MOST pooled verified peers:~n", [], Sim),
+  PrintNodesFun(MaxPVs, 4, -1, "peer(s)"),
+  aesim_simulator:print("Nodes with the LESS pooled verified peers:~n", [], Sim),
+  PrintNodesFun(MinPVs, 4, 1, "peer(s)"),
+  ok.

@@ -215,6 +215,7 @@ new_metrics() -> #{}.
 metrics_inc(Metrics, Name, Inc) ->
   Current = maps:get(Name, Metrics, 0),
   New = Current + Inc,
+  ?assert(New >= 0),
   Metrics#{Name => New}.
 
 metrics_get(Metrics, Name) ->

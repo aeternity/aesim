@@ -144,29 +144,31 @@ disconnect(State, ConnRef, Context, Sim) ->
   #{node_id := NodeId} = Context,
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
-    {ok, Conn} ->
+    {ok, #{status := connected, type := ConnType, peer := PeerId} = Conn} ->
       Sim2 = metrics_inc([connections, disconnect], Context, Sim),
-      Sim3 = disconnect_effects(NodeId, Conn, Context, Sim2),
-      {del_connection(State, ConnRef), Sim3}
+      {Delay, Sim3} = conn_disconnect(Conn, Context, Sim2),
+      {_, Sim4} = post_closed(Delay, PeerId, ConnRef, Sim3),
+      Sim5 = aesim_node:async_conn_terminated(NodeId, PeerId, ConnRef, ConnType, Sim4),
+      {del_connection(State, ConnRef), Sim5};
+    {ok, #{status := connecting, peer := PeerId}} ->
+      Sim2 = async_aborted(PeerId, ConnRef, Sim),
+      {del_connection(State, ConnRef), Sim2}
   end.
 
 -spec disconnect_peer(state(), id(), context(), sim()) -> {state(), sim()}.
-disconnect_peer(State, PeerId, Context, Sim) ->
-  #{node_id := NodeId} = Context,
-  case get_peer_connections(State, PeerId) of
-    [] -> {State, Sim};
-    Conns ->
-      Sim2 = lists:foldl(fun(C, S) ->
-        S2 = metrics_inc([connections, disconnect], Context, S),
-        disconnect_effects(NodeId, C, Context, S2)
-      end, Sim, Conns),
-      {del_peer_connections(State, PeerId), Sim2}
+disconnect_peer(State0, PeerId, Context, Sim0) ->
+  case get_peer_conn_refs(State0, PeerId) of
+    [] -> {State0, Sim0};
+    ConnRefs ->
+      lists:foldl(fun(ConnRef, {State, Sim}) ->
+        disconnect(State, ConnRef, Context, Sim)
+      end, {State0, Sim0}, ConnRefs)
   end.
 
 -spec prepare_accept(state(), id(), conn_ref(), term(), context(), sim())
   -> {accept, state(), term(), sim()} | {reject, state(), sim()}.
 prepare_accept(State, PeerId, ConnRef, Opts, Context, Sim) ->
-  {Conn, Sim2} = conn_new(ConnRef, PeerId, inbound, connected, Context, Sim),
+  {Conn, Sim2} = conn_new(ConnRef, PeerId, inbound, connecting, Context, Sim),
   case conn_accept(Conn, Opts, Context, Sim2) of
     {reject, Delay, Sim2} ->
       {_, Sim3} = post_rejected(Delay, PeerId, ConnRef, Sim2),
@@ -197,6 +199,10 @@ route_event(State, [], rejected, ConnRef, Context, Sim) ->
   on_rejected(State, ConnRef, Context, Sim);
 route_event(State, [], closed, ConnRef, Context, Sim) ->
   on_closed(State, ConnRef, Context, Sim);
+route_event(State, [], confirmed, ConnRef, Context, Sim) ->
+  on_confirmed(State, ConnRef, Context, Sim);
+route_event(State, [], aborted, ConnRef, Context, Sim) ->
+  on_aborted(State, ConnRef, Context, Sim);
 route_event(State, [ConnRef], Name, Params, Context, Sim) ->
   handle_conn_event(State, ConnRef, Name, Params, Context, Sim);
 route_event(State, Addr, Name, Params, Context, Sim) ->
@@ -215,10 +221,8 @@ get_connection(State, ConnRef) ->
   #{connections := Conns} = State,
   maps:find(ConnRef, Conns).
 
-get_peer_connections(State, PeerId) ->
-  #{connections := Conns} = State,
-  ConnRefs = index_keys(index_peers_get(State, PeerId)),
-  maps:values(maps:with(ConnRefs, Conns)).
+get_peer_conn_refs(State, PeerId) ->
+  index_keys(index_peers_get(State, PeerId)).
 
 % Connection status and type shouldn't be changed; this doesn't update the index
 set_connection(State, Conn) ->
@@ -244,10 +248,6 @@ del_connection(State, ConnRef) ->
       index_connection_deleted(State2, Conn)
   end.
 
-del_peer_connections(State, PeerId) ->
-  ConnRefs = index_keys(index_peers_get(State, PeerId)),
-  lists:foldl(fun(C, S) -> del_connection(S, C) end, State, ConnRefs).
-
 update_status(State, ConnRef, NewStatus) ->
   #{connections := Conns} = State,
   case maps:find(ConnRef, Conns) of
@@ -258,26 +258,27 @@ update_status(State, ConnRef, NewStatus) ->
       index_tags_update(State2, ConnRef, OldStatus, NewStatus)
   end.
 
-disconnect_effects(NodeId, Conn, Context, Sim) ->
-  #{ref := ConnRef, type := ConnType, peer := PeerId} = Conn,
-  {Delay, Sim2} = conn_disconnect(Conn, Context, Sim),
-  {_, Sim3} = post_closed(Delay, PeerId, ConnRef, Sim2),
-  {_, Sim4} = aesim_node:post_conn_terminated(0, NodeId, PeerId, ConnRef, ConnType, Sim3),
-  Sim4.
-
 %--- PRIVATE EVENT FUNCTIONS ---------------------------------------------------
 
 post(Delay, NodeId, Name, Params, Sim) ->
   aesim_events:post(Delay, [nodes, NodeId, connections], Name, Params, Sim).
 
-post_closed(Delay, PeerId, ConnRef, Sim) ->
-  post(Delay, PeerId, closed, ConnRef, Sim).
+post_closed(Delay, NodeId, ConnRef, Sim) ->
+  post(Delay, NodeId, closed, ConnRef, Sim).
 
-post_accepted(Delay, PeerId, ConnRef, Sim) ->
-  post(Delay, PeerId, accepted, ConnRef, Sim).
+post_accepted(Delay, NodeId, ConnRef, Sim) ->
+  post(Delay, NodeId, accepted, ConnRef, Sim).
 
-post_rejected(Delay, PeerId, ConnRef, Sim) ->
-  post(Delay, PeerId, rejected, ConnRef, Sim).
+post_rejected(Delay, NodeId, ConnRef, Sim) ->
+  post(Delay, NodeId, rejected, ConnRef, Sim).
+
+async_confirmed(NodeId, ConnRef, Sim) ->
+  {_, Sim2} = post(0, NodeId, confirmed, ConnRef, Sim),
+  Sim2.
+
+async_aborted(NodeId, ConnRef, Sim) ->
+  {_, Sim2} = post(0, NodeId, aborted, ConnRef, Sim),
+  Sim2.
 
 handle_conn_event(State, ConnRef, Name, Params, Context, Sim) ->
   case get_connection(State, ConnRef) of
@@ -298,8 +299,8 @@ on_accepted(State, ConnRef, Context, Sim) ->
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
     {ok, #{peer := PeerId, type := outbound}} ->
-      {_, Sim2} = aesim_node:post_conn_established(0, NodeId, PeerId, ConnRef, outbound, Sim),
-      {_, Sim3} = aesim_node:post_conn_established(0, PeerId, NodeId, ConnRef, inbound, Sim2),
+      Sim2 = async_confirmed(PeerId, ConnRef, Sim),
+      Sim3 = aesim_node:async_conn_established(NodeId, PeerId, ConnRef, outbound, Sim2),
       {update_status(State, ConnRef, connected), Sim3}
   end.
 
@@ -308,7 +309,7 @@ on_rejected(State, ConnRef, Context, Sim) ->
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
     {ok, #{peer := PeerId, type := outbound}} ->
-      {_, Sim2} = aesim_node:post_conn_failed(0, NodeId, PeerId, Sim),
+      Sim2 = aesim_node:async_conn_failed(NodeId, PeerId, Sim),
       {del_connection(State, ConnRef), Sim2}
   end.
 
@@ -317,9 +318,23 @@ on_closed(State, ConnRef, Context, Sim) ->
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
     {ok, #{peer := PeerId, type := ConnType}} ->
-      {_, Sim2} = aesim_node:post_conn_terminated(0, NodeId, PeerId, ConnRef, ConnType, Sim),
+      Sim2 = aesim_node:async_conn_terminated(NodeId, PeerId, ConnRef, ConnType, Sim),
       {del_connection(State, ConnRef), Sim2}
   end.
+
+%% The inbound connection is confirmed
+on_confirmed(State, ConnRef, Context, Sim) ->
+  #{node_id := NodeId} = Context,
+  case get_connection(State, ConnRef) of
+    error -> {State, Sim};
+    {ok, #{peer := PeerId, type := inbound}} ->
+      Sim2 = aesim_node:async_conn_established(NodeId, PeerId, ConnRef, inbound, Sim),
+      {update_status(State, ConnRef, connected), Sim2}
+  end.
+
+%% The connection got closed before it got established
+on_aborted(State, ConnRef, _Context, Sim) ->
+  {del_connection(State, ConnRef), Sim}.
 
 %--- INDEX FUNCTIONS -----------------------------------------------------------
 

@@ -64,6 +64,7 @@
 -export([parse_options/2]).
 -export([new/3]).
 -export([connections/1]).
+-export([pool/1]).
 -export([start/3]).
 -export([connect/3]).
 -export([disconnect/3]).
@@ -81,9 +82,9 @@
 %% Event handling functions; only used by aesim_nodes and aesim_connections
 -export([route_event/5]).
 -export([post_conn_initiated/6]).
--export([post_conn_established/6]).
--export([post_conn_terminated/6]).
--export([post_conn_failed/4]).
+-export([async_conn_established/5]).
+-export([async_conn_terminated/5]).
+-export([async_conn_failed/3]).
 
 %=== MACROS ====================================================================
 
@@ -125,6 +126,8 @@ new(NodeId, CurrAddrs, Sim) ->
   {State4, Sim4}.
 
 connections(#{conns := Conns}) -> Conns.
+
+pool(#{pool := Pool}) -> Pool.
 
 -spec start(state(), neighbours(), sim()) -> {state(), sim()}.
 start(State, Trusted, Sim) ->
@@ -198,17 +201,20 @@ async_peer_expired(NodeId, PeerId, Sim) ->
 post_conn_initiated(Delay, NodeId, PeerId, ConnRef, Opts, Sim) ->
   post(Delay, NodeId, conn_initiated, {PeerId, ConnRef, Opts}, Sim).
 
--spec post_conn_established(delay(), id(), id(), conn_ref(), conn_type(), sim()) -> {event_ref(), sim()}.
-post_conn_established(Delay, NodeId, PeerId, ConnRef, ConnType, Sim) ->
-  post(Delay, NodeId, conn_established, {PeerId, ConnRef, ConnType}, Sim).
+-spec async_conn_established(id(), id(), conn_ref(), conn_type(), sim()) -> sim().
+async_conn_established(NodeId, PeerId, ConnRef, ConnType, Sim) ->
+  {_, Sim2} = post(0, NodeId, conn_established, {PeerId, ConnRef, ConnType}, Sim),
+  Sim2.
 
--spec post_conn_terminated(delay(), id(), id(), conn_ref(), conn_type(), sim()) -> {event_ref(), sim()}.
-post_conn_terminated(Delay, NodeId, PeerId, ConnRef, ConnType, Sim) ->
-  post(Delay, NodeId, conn_terminated, {PeerId, ConnRef, ConnType}, Sim).
+-spec async_conn_terminated(id(), id(), conn_ref(), conn_type(), sim()) -> sim().
+async_conn_terminated(NodeId, PeerId, ConnRef, ConnType, Sim) ->
+  {_, Sim2} = post(0, NodeId, conn_terminated, {PeerId, ConnRef, ConnType}, Sim),
+  Sim2.
 
--spec post_conn_failed(delay(), id(), id(), sim()) -> {event_ref(), sim()}.
-post_conn_failed(Delay, NodeId, PeerId, Sim) ->
-  post(Delay, NodeId, conn_failed, PeerId, Sim).
+-spec async_conn_failed(id(), id(), sim()) -> sim().
+async_conn_failed(NodeId, PeerId, Sim) ->
+  {_, Sim2} = post(0, NodeId, conn_failed, PeerId, Sim),
+  Sim2.
 
 -spec route_event(state(), event_addr(), event_name(), term(), sim()) -> {state(), sim()}.
 route_event(State, [], conn_initiated, {PeerId, ConnRef, Opts}, Sim) ->

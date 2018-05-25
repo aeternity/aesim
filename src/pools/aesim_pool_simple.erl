@@ -24,6 +24,7 @@
 -export([parse_options/2]).
 -export([pool_new/2]).
 -export([pool_init/4]).
+-export([pool_count/2]).
 -export([pool_select/4]).
 -export([pool_gossip/5]).
 -export([pool_handle_event/5]).
@@ -41,13 +42,18 @@ pool_init(State0, Trusted, Context, Sim0) ->
     add_verified(State, PeerId, Context, Sim)
   end, {State0, Sim0}, Trusted).
 
+pool_count(State, all) -> maps:size(State);
+pool_count(State, verified) -> maps:size(State);
+pool_count(_State, unverified) -> 0.
+
 pool_select(State, Exclude, Context, Sim) ->
   case filter_peers(maps:keys(State), Context, Sim) of
-    {[], Sim2} -> {undefined, Sim2};
-    {AvailableIds, Sim2} ->
+    {NextTime, [], Sim2} ->
+      {retry, NextTime, Sim2};
+    {_, AvailableIds, Sim2} ->
       case aesim_utils:rand_pick(1, AvailableIds, Exclude) of
-        [] -> {undefined, Sim2};
-        [PeerId] -> {PeerId, Sim2}
+        [] -> {unavailable, Sim2};
+        [PeerId] -> {selected, PeerId, Sim2}
       end
   end.
 
@@ -90,27 +96,30 @@ del_verified(State, PeerId, Context, Sim) ->
 filter_peers(Ids, Context, Sim0) ->
   #{node_id := NodeId, peers := Peers} = Context,
   #{time := Now} = Sim0,
-  lists:foldl(fun(PeerId, {Acc, Sim}) ->
+  lists:foldl(fun(PeerId, {Min, Acc, Sim}) ->
     #{PeerId := Peer} = Peers,
     #{type := Type, retry_count := RetryCount, retry_time := RetryTime} = Peer,
     case {Type, RetryCount, next_retry_time(RetryCount, RetryTime)} of
       {_, 0, _} ->
         % Peer not currently retrying
-        {[PeerId | Acc], Sim};
-      {T, R, _} when R > ?MAX_RETRIES, T =/= trusted ->
+        {Min, [PeerId | Acc], Sim};
+      {T, R, N} when R > ?MAX_RETRIES, T =/= trusted ->
         % Peer expired the maximum retryes and is not trusted
         Sim2 = aesim_node:async_peer_expired(NodeId, PeerId, Sim),
-        {Acc, Sim2};
+        {safe_min(Min, N), Acc, Sim2};
       {_, _, NextRetryTime} when NextRetryTime =< Now ->
         % Peer is scheduled for retry
-        {[PeerId | Acc], Sim};
-      {_, _, _} ->
+        {Min, [PeerId | Acc], Sim};
+      {_, _R, N} ->
         % Peer is not yet ready to retry
-        {Acc, Sim}
+        {safe_min(Min, N), Acc, Sim}
     end
-  end, {[], Sim0}, Ids).
+  end, {undefined, [], Sim0}, Ids).
 
 next_retry_time(0, _) -> undefined;
 next_retry_time(RetryCount, RetryTime) ->
   BackoffIndex = min(RetryCount, length(?BACKOFF_TIMES)),
   RetryTime + lists:nth(BackoffIndex, ?BACKOFF_TIMES) * 1000.
+
+safe_min(undefined, Value2) -> Value2;
+safe_min(Value1, Value2) -> min(Value1, Value2).
