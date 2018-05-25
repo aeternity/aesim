@@ -18,6 +18,13 @@
        State :: term(),
        Sim :: sim().
 
+-callback pool_init(State, Trusted, Context, Sim)
+  -> {State, Sim}
+  when State :: term(),
+       Trusted :: neighbours(),
+       Context :: context(),
+       Sim :: sim().
+
 -callback pool_select(State, Exclude, Context, Sim)
   -> {undefined | PeerId, Sim}
   when State :: term(),

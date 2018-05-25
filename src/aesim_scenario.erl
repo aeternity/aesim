@@ -58,8 +58,13 @@
 -export([default_start/2]).
 -export([default_progress/2]).
 -export([default_report/3]).
+-export([print_event_status/1]).
+-export([print_node_status/2]).
+-export([print_oulier_info/2]).
 
 %=== MACROS ====================================================================
+
+-define(OUTLIER_COUNT, 4).
 
 -define(PROGRESS_SPECS, [
   {integer, "PROGRESS", right, "%", 8},
@@ -162,42 +167,60 @@ default_progress(Nodes, Sim) ->
 
 -spec default_report(termination_reason(), aesim_nodes:state(), sim()) -> ok.
 default_report(_Reason, Nodes, Sim) ->
-  aesim_simulator:print_title("EVENTS STATUS", Sim),
-  aesim_events:print_summary(Sim),
+  print_event_status(Sim),
+  print_node_status(Nodes, Sim),
+  print_oulier_info(Nodes, Sim),
+  aesim_metrics:print_report(Sim).
 
+print_event_status(Sim) ->
+  aesim_simulator:print_title("EVENTS STATUS", Sim),
+  aesim_events:print_summary(Sim).
+
+print_node_status(Nodes, Sim) ->
   aesim_simulator:print_title("NODES STATUS", Sim),
   aesim_simulator:print_header(?STATUS_SPECS, Sim),
   lists:foreach(fun({Desc, {Min, Avg, Med, Max}}) ->
     Fields = [Desc, Min, Avg, Med, Max],
     aesim_simulator:print_fields(?STATUS_SPECS, Fields, Sim)
-  end, nodes_status(Nodes, Sim)),
+  end, nodes_status(Nodes, Sim)).
 
-  aesim_simulator:print_title("DEBUG", Sim),
+print_oulier_info(Nodes, Sim) ->
+  aesim_simulator:print_title("OUTLIER INFORMATION", Sim),
   TrustedIds = [I || {I, _} <- aesim_nodes:trusted(Nodes)],
-  Desc = fun(Id) ->
+  NodeInfo = fun(Id) ->
     case lists:member(Id, TrustedIds) of
       true -> " (trusted)";
       false -> ""
     end
   end,
-  Data = aesim_nodes:reduce(Nodes, fun(I, N, Acc) ->
-    C = aesim_node:connections(N),
-    [{-aesim_connections:count(C, outbound),
-      -aesim_connections:count(C, inbound), I}
-    | Acc]
-  end, []),
-  {MaxOuts, _} = lists:split(4, lists:keysort(1, Data)),
-  {MaxIns, _} = lists:split(4, lists:keysort(2, Data)),
-  aesim_simulator:print("Nodes with the most outbound connections:~n", [], Sim),
-  lists:foreach(fun({Max, _, Id}) ->
+  {MinData, MaxData} = aesim_nodes:reduce(Nodes,fun(I, N, {MinAcc, MaxAcc}) ->
+    Conns = aesim_node:connections(N),
+    OutConnCount = aesim_connections:count(Conns, outbound),
+    InConnCount = aesim_connections:count(Conns, inbound),
+    {[{I, OutConnCount, InConnCount} | MinAcc],
+     [{I, -OutConnCount, -InConnCount} | MaxAcc]}
+  end, {[], []}),
+  {MaxOuts, _} = lists:split(?OUTLIER_COUNT, lists:keysort(2, MaxData)),
+  {MinOuts, _} = lists:split(?OUTLIER_COUNT, lists:keysort(2, MinData)),
+  {MaxIns, _} = lists:split(?OUTLIER_COUNT, lists:keysort(3, MaxData)),
+  {MinIns, _} = lists:split(?OUTLIER_COUNT, lists:keysort(3, MinData)),
+  aesim_simulator:print("Nodes with the MOST outbound connections:~n", [], Sim),
+  lists:foreach(fun({NodeId, Value, _}) ->
     aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
-                          [Id, -Max, Desc(Id)], Sim)
+                          [NodeId, -Value, NodeInfo(NodeId)], Sim)
   end, MaxOuts),
-  aesim_simulator:print("Nodes with the most inbound connections:~n", [], Sim),
-  lists:foreach(fun({_, Max, Id}) ->
+  aesim_simulator:print("Nodes with the LESS outbound connections:~n", [], Sim),
+  lists:foreach(fun({NodeId, Value, _}) ->
     aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
-                          [Id, -Max, Desc(Id)], Sim)
+                          [NodeId, Value, NodeInfo(NodeId)], Sim)
+  end, MinOuts),
+  aesim_simulator:print("Nodes with the MOST inbound connections:~n", [], Sim),
+  lists:foreach(fun({NodeId, _, Value}) ->
+    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
+                          [NodeId, -Value, NodeInfo(NodeId)], Sim)
   end, MaxIns),
-
-  aesim_metrics:print_report(Sim),
-  ok.
+  aesim_simulator:print("Nodes with the LESS inbound connections:~n", [], Sim),
+  lists:foreach(fun({NodeId, _, Value}) ->
+    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
+                          [NodeId, Value, NodeInfo(NodeId)], Sim)
+  end, MinIns).

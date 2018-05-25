@@ -29,11 +29,11 @@ format_time(Miliseconds) ->
   format("~bh~2.10.0bm~2.10.0bs~3.10.0b", Args).
 
 %% Returns X where 0 <= X < N
--spec rand(pos_integer()) -> pos_integer().
+-spec rand(non_neg_integer()) -> non_neg_integer().
 rand(N) -> rand:uniform(N) - 1.
 
 %% Returns X where N <= X < M
--spec rand(pos_integer(), pos_integer()) -> pos_integer().
+-spec rand(non_neg_integer(), non_neg_integer()) -> non_neg_integer().
 rand(N, M) -> N + rand:uniform(M - N) - 1.
 
 -spec rand_take(list()) -> {term(), list()}.

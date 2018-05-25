@@ -75,6 +75,7 @@
 -export([async_disconnect/3]).
 -export([async_disconnect_peer/3]).
 -export([async_gossip/4]).
+-export([async_peer_expired/3]).
 -export([send/4]).
 
 %% Event handling functions; only used by aesim_nodes and aesim_connections
@@ -131,14 +132,17 @@ start(State, Trusted, Sim) ->
   {State2, Sim2} = lists:foldl(fun({Id, Addr}, {N, S}) ->
     peer_add_trusted(N, Id, Addr, NodeAddr, S)
   end, {State, Sim}, Trusted),
-  node_start(State2, Trusted, Sim2).
+  {State3, Sim3} = pool_init(State2, Trusted, Sim2),
+  {State4, Sim4} = node_start(State3, Trusted, Sim3),
+  {State4, Sim4}.
 
 -spec connect(state(), id() | [id()], sim()) -> {state(), sim()}.
 connect(State, PeerIds, Sim) ->
   % First be sure the peer exists
   {State2, Sim2} = peer_ensure(State, PeerIds, Sim),
-  {State3, Sim3} = conns_connect(State2, PeerIds, Sim2),
-  {State3, Sim3}.
+  Sim3 = metrics_connection_retry(State2, PeerIds, Sim2),
+  {State3, Sim4} = conns_connect(State2, PeerIds, Sim3),
+  {State3, Sim4}.
 
 -spec disconnect(state(), conn_ref() | [conn_ref()], sim()) -> {state(), sim()}.
 disconnect(State, ConnRefs, Sim) ->
@@ -163,21 +167,30 @@ report(State, Type, Sim) ->
 
 %--- API FUNCTIONS FOR CALLBACK MODULES ----------------------------------------
 
--spec async_connect(id(), id() | [id()], sim()) -> {event_ref(), sim()}.
+-spec async_connect(id(), id() | [id()], sim()) -> sim().
 async_connect(NodeId, PeerIds, Sim) ->
-  post(0, NodeId, do_connect, PeerIds, Sim).
+  {_, Sim2} = post(0, NodeId, do_connect, PeerIds, Sim),
+  Sim2.
 
--spec async_disconnect(id(), conn_ref() | [conn_ref()], sim()) -> {event_ref(), sim()}.
+-spec async_disconnect(id(), conn_ref() | [conn_ref()], sim()) -> sim().
 async_disconnect(NodeId, ConnRefs, Sim) ->
-  post(0, NodeId, do_disconnect, ConnRefs, Sim).
+  {_, Sim2} = post(0, NodeId, do_disconnect, ConnRefs, Sim),
+  Sim2.
 
--spec async_disconnect_peer(id(), id() | [id()], sim()) -> {event_ref(), sim()}.
+-spec async_disconnect_peer(id(), id() | [id()], sim()) -> sim().
 async_disconnect_peer(NodeId, PeerIds, Sim) ->
-  post(0, NodeId, do_disconnect_peer, PeerIds, Sim).
+  {_, Sim2} = post(0, NodeId, do_disconnect_peer, PeerIds, Sim),
+  Sim2.
 
--spec async_gossip(id(), neighbour(), neighbours(), sim()) -> {event_ref(), sim()}.
+-spec async_gossip(id(), neighbour(), neighbours(), sim()) -> sim().
 async_gossip(NodeId, Source, Neighbours, Sim) ->
-  post(0, NodeId, do_gossip, {Source, Neighbours}, Sim).
+  {_, Sim2} = post(0, NodeId, do_gossip, {Source, Neighbours}, Sim),
+  Sim2.
+
+-spec async_peer_expired(id(), id(), sim()) -> sim().
+async_peer_expired(NodeId, PeerId, Sim) ->
+  {_, Sim2} = post(0, NodeId, peer_expired, PeerId, Sim),
+  Sim2.
 
 %--- PUBLIC EVENT HANDLING FUNCTIONS -------------------------------------------
 
@@ -210,6 +223,8 @@ route_event(State, [], conn_send, {ConnRef, Msg}, Sim) ->
   on_connection_send(State, ConnRef, Msg, Sim);
 route_event(State, [], conn_receive, {ConnRef, Msg}, Sim) ->
   on_connection_receive(State, ConnRef, Msg, Sim);
+route_event(State, [], peer_expired, PeerId, Sim) ->
+  on_peer_expired(State, PeerId, Sim);
 route_event(State, [], do_connect, PeerIds, Sim) ->
   connect(State, PeerIds, Sim);
 route_event(State, [], do_disconnect, ConnRefs, Sim) ->
@@ -238,14 +253,6 @@ send(NodeId, ConnRef, Message, Sim) ->
 
 %=== INTERNAL FUNCTIONS ========================================================
 
-metrics_inc(State, Name, Sim) ->
-  #{id := NodeId} = State,
-  aesim_metrics:inc(NodeId, Name, 1, Sim).
-
-metrics_dec(State, Name, Sim) ->
-  #{id := NodeId} = State,
-  aesim_metrics:inc(NodeId, Name, -1, Sim).
-
 do_gossip(State, Source, Neighbours, Sim) ->
   Sim2 = metrics_inc(State, [gossip, received], Sim),
   {SourceId, SourceAddr} = Source,
@@ -259,8 +266,33 @@ forward_event(State, Name, Params, Sim) ->
   {State3, Sim3} = node_handle_event(State2, Name, Params, Sim2),
   {State3, Sim3}.
 
+%--- METRIC FUNCTIONS ----------------------------------------------------------
+
+metrics_inc(State, Name, Sim) ->
+  #{id := NodeId} = State,
+  aesim_metrics:inc(NodeId, Name, 1, Sim).
+
+metrics_dec(State, Name, Sim) ->
+  #{id := NodeId} = State,
+  aesim_metrics:inc(NodeId, Name, -1, Sim).
+
+%% Send the metric connection.retry if relevent
+metrics_connection_retry(State, PeerIds, Sim0) when is_list(PeerIds) ->
+  lists:foldl(fun(PeerId, Sim) ->
+    metrics_connection_retry(State, PeerId, Sim)
+  end, Sim0, PeerIds);
+metrics_connection_retry(State, PeerId, Sim) ->
+  #{peers := Peers} = State,
+  #{PeerId := Peer} = Peers,
+  case Peer of
+    #{retry_count := RetryCount} when RetryCount > 0 ->
+      metrics_inc(State, [connections, retry], Sim);
+    _ -> Sim
+  end.
+
 %--- PRIVATE EVENT HANDLING FUNCTIONS ------------------------------------------
 
+-spec post(non_neg_integer(), id(), atom(), term(), sim()) -> {event_ref(), sim()}.
 post(Delay, NodeId, Name, Params, Sim) ->
   aesim_events:post(Delay, [nodes, NodeId], Name, Params, Sim).
 
@@ -320,6 +352,12 @@ on_connection_receive(State, ConnRef, Msg, Sim) ->
       node_handle_message(State, PeerId, ConnRef, Msg, Sim);
     _ -> {State, Sim}
   end.
+
+on_peer_expired(State, PeerId, Sim) ->
+  Sim2 = metrics_inc(State, [peers, expired], Sim),
+  {State2, Sim3} = disconnect_peer(State, PeerId, Sim2),
+  State3 = peer_expired(State2, PeerId),
+  forward_event(State3, peer_expired, PeerId, Sim3).
 
 %--- PEER FUNCTIONS ------------------------------------------------------------
 
@@ -402,6 +440,13 @@ peer_connection_failed(State, PeerId, Time) ->
   Peers2 = Peers#{PeerId := Peer2},
   State#{peers := Peers2}.
 
+peer_expired(State, PeerId) ->
+  #{peers := Peers} = State,
+  #{PeerId := Peer} = Peers,
+  Peer2 = Peer#{conn_time := undefined, retry_count := 0, retry_time := undefined},
+  Peers2 = Peers#{PeerId := Peer2},
+  State#{peers := Peers2}.
+
 %--- CONTEXT FUNCTIONS ---------------------------------------------------------
 
 context(State, Extra, AddrPostfix) ->
@@ -467,8 +512,14 @@ node_report(State, Type, Sim) ->
 pool_new(State, Sim) ->
   Context = pool_context(State),
   PoolMod = cfg_pool_mod(Sim),
-  {Sub, Sim2} = PoolMod:pool_new(Context, Sim),
-  {State#{pool => {PoolMod, Sub}}, Sim2}.
+  {Pool, Sim2} = PoolMod:pool_new(Context, Sim),
+  {State#{pool => {PoolMod, Pool}}, Sim2}.
+
+pool_init(State, Trusted, Sim) ->
+  Context = pool_context(State),
+  #{pool := {PoolMod, Pool}} = State,
+  {Pool2, Sim2} = PoolMod:pool_init(Pool, Trusted, Context, Sim),
+  {State#{pool => {PoolMod, Pool2}}, Sim2}.
 
 pool_handle_event(State, Name, Params, Sim) ->
   #{pool := {PoolMod, Pool}} = State,

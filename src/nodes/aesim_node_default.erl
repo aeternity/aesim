@@ -103,7 +103,7 @@ node_handle_message(State, PeerId, ConnRef, Message, Context, Sim) ->
   #{node_id := NodeId} = Context,
   lager:warning("Unexpected message from node ~w to node ~w: ~p",
                 [PeerId, NodeId, Message]),
-  {_, Sim2} = aesim_node:async_disconnect(NodeId, ConnRef, Sim),
+  Sim2 = aesim_node:async_disconnect(NodeId, ConnRef, Sim),
   {State, Sim2}.
 
 report(_State, _Type, _Context, _Sim) -> #{}.
@@ -146,9 +146,10 @@ prune_connections(State, PeerId, ConnRef, Context, Sim) ->
   case aesim_connections:peer_connections(Conns, PeerId) of
     [_] -> {continue, State, Sim};
     ConnRefs ->
+      ?assert(length(ConnRefs) > 0),
       {SelRef, OtherRefs} = select_connection(NodeId, PeerId, ConnRefs, Conns),
       Sim2 = aesim_metrics:inc(NodeId, [connections, pruned], length(OtherRefs), Sim),
-      {_, Sim3} = aesim_node:async_disconnect(NodeId, OtherRefs, Sim2),
+      Sim3 = aesim_node:async_disconnect(NodeId, OtherRefs, Sim2),
       case SelRef =:= ConnRef of
         true -> {continue, State, Sim3};
         false -> {abort, State, Sim3}
@@ -198,7 +199,7 @@ maybe_accept(State, _PeerId, _Context, Sim) ->
 
 connect(State, NodeId, PeerId, Sim) ->
   #{outbound := Outbound} = State,
-  {_, Sim2} = aesim_node:async_connect(NodeId, PeerId, Sim),
+  Sim2 = aesim_node:async_connect(NodeId, PeerId, Sim),
   {State#{outbound := Outbound + 1}, Sim2}.
 
 accept(State, Sim) ->
@@ -298,14 +299,14 @@ got_ping(State, PeerId, ConnRef, PeerAddr, Neighbours, Context, Sim) ->
   #{node_id := NodeId} = Context,
   Exclude = [PeerId | [I || {I, _} <- Neighbours]],
   Source = {PeerId, PeerAddr},
-  {_, Sim2} = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
+  Sim2 = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
   Sim3 = sched_pong(ConnRef, Exclude, Context, Sim2),
   {State, Sim3}.
 
 got_pong(State, PeerId, ConnRef, PeerAddr, Neighbours, Context, Sim) ->
   #{node_id := NodeId} = Context,
   Source = {PeerId, PeerAddr},
-  {_, Sim2} = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
+  Sim2 = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
   Sim3 = sched_ping(false, ConnRef, Context, Sim2),
   {State, Sim3}.
 
