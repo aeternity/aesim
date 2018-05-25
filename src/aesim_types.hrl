@@ -6,6 +6,7 @@
 -type id() :: pos_integer().
 -type address() :: {inet:ip_address(), inet:port_number()}.
 -type address_map() :: #{address() => id()}.
+-type termination_reason() :: error | frozen | normal.
 
 -type neighbour() :: {id(), address()}.
 -type neighbours() :: [neighbour()].
@@ -54,12 +55,12 @@
   metrics := term(),
   sim_dir := undefined | string(),
   report_file := undefined | file:io_device(),
-  real_start_time := real_time(),
+  real_start_time := real_time() | undefined, % should never be undefined
   time := sim_time(),
   max_sim_time := sim_time() | infinity,
   max_real_time := real_time() | infinity,
   progress_sim_time := sim_time(),
   progress_sim_interval := sim_time(),
-  progress_real_time := real_time(),
+  progress_real_time := real_time() | undefined, % should never be undefined
   progress_real_interval := real_time()
 }.

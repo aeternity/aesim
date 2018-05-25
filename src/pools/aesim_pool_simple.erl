@@ -50,5 +50,11 @@ report(State, _Type, _Context, _Sim) ->
 
 %--- EVENT FUNCTIONS -----------------------------------------------------------
 
-on_peer_identified(State, PeerId, _Context, Sim) ->
-  {State#{PeerId => true}, Sim}.
+on_peer_identified(State, PeerId, Context, Sim) ->
+  case maps:find(PeerId, State) of
+    {ok, _} -> ignore;
+    error ->
+      #{node_id := NodeId} = Context,
+      Sim2 = aesim_metrics:inc(NodeId, [pool, verified], 1, Sim),
+      {State#{PeerId => true}, Sim2}
+  end.

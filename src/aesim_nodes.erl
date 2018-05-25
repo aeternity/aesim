@@ -10,6 +10,8 @@
 %% API functions
 -export([parse_options/2]).
 -export([new/1]).
+-export([trusted/1]).
+-export([reduce/3]).
 -export([count/1]).
 -export([bootstrap/2]).
 -export([start_node/2]).
@@ -57,6 +59,13 @@ new(Sim) ->
     nodes => #{}
   },
   {State, Sim}.
+
+trusted(#{trusted := Trusted}) -> Trusted.
+
+-spec reduce(state(), fun((id(), aesim_node:state(), term()) -> term()), term()) -> term().
+reduce(State, Fun, Acc) ->
+  #{nodes := Nodes} = State,
+  maps:fold(Fun, Acc, Nodes).
 
 -spec count(state()) -> non_neg_integer().
 count(#{nodes := Nodes}) -> maps:size(Nodes).
@@ -138,12 +147,13 @@ node_add(State, Sim) ->
   {State2, NextId, Addr, Sim2}.
 
 node_start(State, NodeId, Sim) ->
+  Sim2 = aesim_metrics:inc([nodes, count], 1, Sim),
   #{nodes := Nodes, trusted := AllTrusted} = State,
   #{NodeId := Node} = Nodes,
   Trusted = [{Id, Addr} || {Id, Addr} <- AllTrusted, Id =/= NodeId],
-  {Node2, Sim2} = aesim_node:start(Node, Trusted, Sim),
+  {Node2, Sim3} = aesim_node:start(Node, Trusted, Sim2),
   Nodes2 = Nodes#{NodeId := Node2},
-  {State#{nodes := Nodes2}, Sim2}.
+  {State#{nodes := Nodes2}, Sim3}.
 
 %--- PRIVATE EVENT FUNCTIONS ---------------------------------------------------
 

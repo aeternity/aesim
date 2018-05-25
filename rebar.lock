@@ -1,5 +1,9 @@
 {"1.1.0",
-[{<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+[{<<"errd">>,
+  {git,"git@github.com:archaelus/errd.git",
+       {ref,"9c3f98403354a4f0bec3582f69b513364306ff9a"}},
+  0},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.6.2">>},0}]}.
 [
 {pkg_hash,[

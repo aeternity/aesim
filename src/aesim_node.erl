@@ -63,6 +63,7 @@
 %% API functions
 -export([parse_options/2]).
 -export([new/3]).
+-export([connections/1]).
 -export([start/3]).
 -export([connect/3]).
 -export([disconnect/3]).
@@ -122,11 +123,13 @@ new(NodeId, CurrAddrs, Sim) ->
   {State4, Sim4} = pool_new(State3, Sim3),
   {State4, Sim4}.
 
+connections(#{conns := Conns}) -> Conns.
+
 -spec start(state(), neighbours(), sim()) -> {state(), sim()}.
 start(State, Trusted, Sim) ->
   #{addr := NodeAddr} = State,
   {State2, Sim2} = lists:foldl(fun({Id, Addr}, {N, S}) ->
-    peer_add(N, trusted, Id, Addr, NodeAddr, undefined, S)
+    peer_add_trusted(N, Id, Addr, NodeAddr, S)
   end, {State, Sim}, Trusted),
   node_start(State2, Trusted, Sim2).
 
@@ -239,6 +242,10 @@ metrics_inc(State, Name, Sim) ->
   #{id := NodeId} = State,
   aesim_metrics:inc(NodeId, Name, 1, Sim).
 
+metrics_dec(State, Name, Sim) ->
+  #{id := NodeId} = State,
+  aesim_metrics:inc(NodeId, Name, -1, Sim).
+
 do_gossip(State, Source, Neighbours, Sim) ->
   Sim2 = metrics_inc(State, [gossip, received], Sim),
   {SourceId, SourceAddr} = Source,
@@ -275,15 +282,17 @@ on_connection_initiated(State, PeerId, ConnRef, Opts, Sim) ->
 
 on_connection_established(State, PeerId, ConnRef, ConnType, Sim) ->
   #{time := Time} = Sim,
-  Sim2 = metrics_inc(State, [connections, established], Sim),
+  Sim2 = metrics_inc(State, [connections, established, ConnType], Sim),
+  Sim3 = metrics_inc(State, [connections, count, ConnType], Sim2),
   % Update peers in case we didn't know about it yet
-  {State2, Sim3} = peer_ensure(State, PeerId, Sim2),
+  {State2, Sim4} = peer_ensure(State, PeerId, Sim3),
   State3 = peer_connected(State2, PeerId, Time),
-  forward_event(State3, conn_established, {PeerId, ConnRef, ConnType}, Sim3).
+  forward_event(State3, conn_established, {PeerId, ConnRef, ConnType}, Sim4).
 
-on_connection_terminated(State, PeerId, ConnRef, Type, Sim) ->
-  Sim2 = metrics_inc(State, [connections, terminated, Type], Sim),
-  forward_event(State, conn_terminated, {PeerId, ConnRef, Type}, Sim2).
+on_connection_terminated(State, PeerId, ConnRef, ConnType, Sim) ->
+  Sim2 = metrics_inc(State, [connections, terminated, ConnType], Sim),
+  Sim3 = metrics_dec(State, [connections, count, ConnType], Sim2),
+  forward_event(State, conn_terminated, {PeerId, ConnRef, ConnType}, Sim3).
 
 on_connection_failed(State, PeerId, Sim) ->
   #{time := Time} = Sim,
@@ -325,17 +334,18 @@ peer_new(PeerType, PeerAddr, SourceAddr, GossipTime) ->
   }.
 
 peer_add(State, PeerId, Sim) ->
-  peer_add(State, default, PeerId, undefined, undefined, undefined, Sim).
-
-peer_add(State, PeerType, PeerId, PeerAddr, SourceAddr, GossipTime, Sim) ->
   #{peers := Peers} = State,
   ?assertNot(maps:is_key(PeerId, Peers)),
-  Peer = peer_new(PeerType, PeerAddr, SourceAddr, GossipTime),
+  Peer = peer_new(default, undefined, undefined, undefined),
   State2 = State#{peers := Peers#{PeerId => Peer}},
-  case PeerAddr of
-    undefined -> forward_event(State2, peer_added, PeerId, Sim);
-    _Addr -> forward_event(State2, peer_identified, PeerId, Sim)
-  end.
+  forward_event(State2, peer_added, PeerId, Sim).
+
+% Should only be called before starting a node; it doesn't notify.
+peer_add_trusted(State, PeerId, PeerAddr, SourceAddr, Sim) ->
+  #{peers := Peers} = State,
+  ?assertNot(maps:is_key(PeerId, Peers)),
+  Peer = peer_new(trusted, PeerAddr, SourceAddr, undefined),
+  {State#{peers := Peers#{PeerId => Peer}}, Sim}.
 
 peer_ensure(State, undefined, Sim) -> {State, Sim};
 peer_ensure(State, PeerIds, Sim) when is_list(PeerIds) ->

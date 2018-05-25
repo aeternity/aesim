@@ -53,10 +53,6 @@
 %=== EXPORTS ===================================================================
 
 -export([post/4]).
--export([print_separator/1]).
--export([print_title/2]).
--export([print_header/2]).
--export([print_fields/3]).
 -export([calculate_progress/1]).
 -export([nodes_status/2]).
 -export([default_start/2]).
@@ -65,10 +61,6 @@
 
 %=== MACROS ====================================================================
 
--define(LINE_LENGTH, 80).
--define(PREFIX_SIZE, 3).
--define(HEADER_CHAR, $#).
--define(NO_SPACE_CHAR, $*).
 -define(PROGRESS_SPECS, [
   {integer, "PROGRESS", right, "%", 8},
   {time, "REAL-TIME", right, undefined, 13},
@@ -79,7 +71,7 @@
   {integer, "CONNS", right, undefined, 7},
   {integer, "EVENTS", right, undefined, 7}
 ]).
--define(METRIC_SPECS, [
+-define(STATUS_SPECS, [
   {string, "DESCRIPTION", left, undefined, 48},
   {integer, "MINIMUM", right, undefined, 7},
   {integer, "AVERAGE", right, undefined, 7},
@@ -87,40 +79,11 @@
   {integer, "MAXIMUM", right, undefined, 7}
 ]).
 
-%=== TYPES =====================================================================
-
--type termination_reason() :: timeout | frozen.
--type print_type() :: string | integer | time | speed.
--type print_just() :: left | right.
--type print_spec() :: {print_type(), string(), print_just(), string() | undefined, pos_integer()}.
--type print_specs() :: [print_spec()].
-
 %=== API FUNCTIONS =============================================================
 
 -spec post(delay(), event_name(), term(), sim()) -> {event_ref(), sim()}.
 post(Delay, Name, Params, Sim) ->
   aesim_events:post(Delay, [scenario], Name, Params, Sim).
-
--spec print_separator(sim()) -> ok.
-print_separator(Sim) ->
-  aesim_simulator:print("~s~n", [lists:duplicate(?LINE_LENGTH, ?HEADER_CHAR)], Sim).
-
--spec print_title(string(), sim()) -> ok.
-print_title(Title, Sim) ->
-  Prefix = lists:duplicate(?PREFIX_SIZE, ?HEADER_CHAR),
-  PostfixSize = ?LINE_LENGTH - (length(Title) + 2 + length(Prefix)),
-  Postfix = lists:duplicate(PostfixSize, ?HEADER_CHAR),
-  aesim_simulator:print("~s ~s ~s~n", [Prefix, Title, Postfix], Sim).
-
--spec print_header(print_specs(), sim()) -> ok.
-print_header(Specs, Sim) ->
-  {Format, Values} = header_print_params(Specs),
-  aesim_simulator:print(Format, Values, Sim).
-
--spec print_fields(print_specs(), [term()], sim()) -> ok.
-print_fields(Specs, Fields, Sim) ->
-  {Format, Values} = fields_print_params(Specs, Fields),
-  aesim_simulator:print(Format, Values, Sim).
 
 -spec calculate_progress(sim()) -> map().
 calculate_progress(Sim) ->
@@ -143,6 +106,8 @@ calculate_progress(Sim) ->
     global_speed => SimProgress / (RealProgress - RealStartTime)
   }.
 
+
+% -dialyzer({nowarn_function, nodes_status/2}).
 nodes_status(Nodes, Sim) ->
   #{nodes := NodeReports} = aesim_nodes:report(Nodes, complete, Sim),
   NodeCount = aesim_nodes:count(Nodes),
@@ -173,10 +138,10 @@ nodes_status(Nodes, Sim) ->
 -spec default_start(aesim_nodes:state(), sim()) -> {aesim_nodes:state(), sim()}.
 default_start(Nodes, Sim) ->
   {Nodes2, Sim2} = aesim_nodes:bootstrap(Nodes, Sim),
-  print_title("CONFIGURATION", Sim2),
+  aesim_simulator:print_title("CONFIGURATION", Sim2),
   aesim_config:print_config(Sim2),
-  print_title("SIMULATION", Sim2),
-  print_header(?PROGRESS_SPECS, Sim2),
+  aesim_simulator:print_title("SIMULATION", Sim2),
+  aesim_simulator:print_header(?PROGRESS_SPECS, Sim2),
   {Nodes2, Sim2}.
 
 -spec default_progress(aesim_nodes:state(), sim()) -> ok.
@@ -193,80 +158,46 @@ default_progress(Nodes, Sim) ->
   } = aesim_nodes:report(Nodes, simple, Sim),
   Fields = [Progress, RealTime, SimTime, CurrSpeed, GlobSpeed,
             NodeCount, ConnCount, EventCount],
-  print_fields(?PROGRESS_SPECS, Fields, Sim).
+  aesim_simulator:print_fields(?PROGRESS_SPECS, Fields, Sim).
 
 -spec default_report(termination_reason(), aesim_nodes:state(), sim()) -> ok.
 default_report(_Reason, Nodes, Sim) ->
-  print_title("EVENTS STATUS", Sim),
+  aesim_simulator:print_title("EVENTS STATUS", Sim),
   aesim_events:print_summary(Sim),
-  print_title("NODES STATUS", Sim),
-  print_header(?METRIC_SPECS, Sim),
+
+  aesim_simulator:print_title("NODES STATUS", Sim),
+  aesim_simulator:print_header(?STATUS_SPECS, Sim),
   lists:foreach(fun({Desc, {Min, Avg, Med, Max}}) ->
     Fields = [Desc, Min, Avg, Med, Max],
-    print_fields(?METRIC_SPECS, Fields, Sim)
+    aesim_simulator:print_fields(?STATUS_SPECS, Fields, Sim)
   end, nodes_status(Nodes, Sim)),
-  print_title("NODES METRICS", Sim),
-  print_header(?METRIC_SPECS, Sim),
-  SortedMetrics = lists:keysort(1, aesim_metrics:collect_nodes_metrics(Sim)),
-  lists:foreach(fun({Name, {Min, Avg, Med, Max}}) ->
-    Desc = aesim_metrics:name_to_list(Name),
-    Fields = [Desc, Min, Avg, Med, Max],
-    print_fields(?METRIC_SPECS, Fields, Sim)
-  end, SortedMetrics),
+
+  aesim_simulator:print_title("DEBUG", Sim),
+  TrustedIds = [I || {I, _} <- aesim_nodes:trusted(Nodes)],
+  Desc = fun(Id) ->
+    case lists:member(Id, TrustedIds) of
+      true -> " (trusted)";
+      false -> ""
+    end
+  end,
+  Data = aesim_nodes:reduce(Nodes, fun(I, N, Acc) ->
+    C = aesim_node:connections(N),
+    [{-aesim_connections:count(C, outbound),
+      -aesim_connections:count(C, inbound), I}
+    | Acc]
+  end, []),
+  {MaxOuts, _} = lists:split(4, lists:keysort(1, Data)),
+  {MaxIns, _} = lists:split(4, lists:keysort(2, Data)),
+  aesim_simulator:print("Nodes with the most outbound connections:~n", [], Sim),
+  lists:foreach(fun({Max, _, Id}) ->
+    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
+                          [Id, -Max, Desc(Id)], Sim)
+  end, MaxOuts),
+  aesim_simulator:print("Nodes with the most inbound connections:~n", [], Sim),
+  lists:foreach(fun({_, Max, Id}) ->
+    aesim_simulator:print("  Node ~4b: ~5b connection(s)~s~n",
+                          [Id, -Max, Desc(Id)], Sim)
+  end, MaxIns),
+
+  aesim_metrics:print_report(Sim),
   ok.
-
-%=== INTERNAL FUNCTIONS ========================================================
-
-header_print_params(Specs) ->
-  header_print_params(Specs, [], []).
-
-header_print_params([], FmtAcc, ValAcc) ->
-  Format = lists:flatten(lists:join(" ", lists:reverse(FmtAcc))),
-  {Format ++ "~n", lists:reverse(ValAcc)};
-header_print_params([Spec | Rest], FmtAcc, ValAcc) ->
-  {_Type, Name, Just, _Unit, Size} = Spec,
-  {Fmt, Val} = make_format(string, Just, truncate(Name, Size), undefined, Size),
-  header_print_params(Rest, [Fmt | FmtAcc], [Val | ValAcc]).
-
-fields_print_params(Specs, Values) ->
-  fields_print_params(Specs, Values, [], []).
-
-fields_print_params([], [], FmtAcc, ValAcc) ->
-  Format = lists:flatten(lists:join(" ", lists:reverse(FmtAcc))),
-  {Format ++ "~n", lists:reverse(ValAcc)};
-fields_print_params([Spec | Specs], [Value | Values], FmtAcc, ValAcc) ->
-  {Type, _Name, Just, Unit, Size} = Spec,
-  {Fmt, Val} = make_format(Type, Just, Value, Unit, Size),
-  fields_print_params(Specs, Values, [Fmt | FmtAcc], [Val | ValAcc]).
-
-truncate(Str, Size) when is_list(Str) ->
-  string:sub_string(Str, 1, Size).
-
-resize(Str, Size) when is_list(Str), length(Str) =< Size -> Str;
-resize(_Str, Size) -> lists:duplicate(Size, ?NO_SPACE_CHAR).
-
-make_format(Type, left, Field, Unit, Size) ->
-  Value = resize(convert(Type, Field, Unit), Size),
-  {aesim_utils:format("~~~ws", [-Size]), Value};
-make_format(Type, right, Field, Unit, Size) ->
-  Value = resize(convert(Type, Field, Unit), Size),
-  {aesim_utils:format("~~~ws", [Size]), Value}.
-
-convert(string, Value, undefined) when is_list(Value) ->
-  Value;
-convert(string, Value, Unit) when is_list(Value) ->
-  aesim_utils:format("~s~s", [Value, Unit]);
-convert(integer, Value, undefined) when is_integer(Value) ->
-  aesim_utils:format("~w", [Value]);
-convert(integer, Value, Unit) when is_integer(Value) ->
-  aesim_utils:format("~w~s", [Value, Unit]);
-convert(time, Value, undefined) when is_integer(Value) ->
-  aesim_utils:format_time(Value);
-convert(speed, Value, undefined) when is_float(Value), Value >= 1 ->
-  aesim_utils:format("~b", [round(Value)]);
-convert(speed, Value, Unit) when is_float(Value), Value >= 1 ->
-  aesim_utils:format("~b~s", [round(Value), Unit]);
-convert(speed, Value, undefined) when is_float(Value) ->
-  aesim_utils:format("1/~b", [round(1 / Value)]);
-convert(speed, Value, Unit) when is_float(Value) ->
-  aesim_utils:format("1/~b~s", [round(1 / Value), Unit]).

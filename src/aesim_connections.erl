@@ -48,8 +48,8 @@
 
 -type state() :: #{
   connections := #{conn_ref() => connection()},
-  peer_index := #{id() => #{conn_ref() => true}},
-  tag_indexes := #{atom() => #{conn_ref() => true}}
+  peer_index := #{id() => sets:set(conn_ref())},
+  tag_indexes := #{atom() => sets:set(conn_ref())}
 }.
 
 -export_type([state/0]).
@@ -79,23 +79,23 @@ new(_Context, Sim) ->
     connections => #{},
     peer_index => #{},
     tag_indexes => #{
-      inbound => #{},
-      outbound => #{},
-      connecting => #{},
-      connected => #{}
+      inbound => sets:new(),
+      outbound => sets:new(),
+      connecting => sets:new(),
+      connected => sets:new()
     }
   },
   {State, Sim}.
 
 -spec count(state(), all | conn_filter() | [conn_filter()]) -> pos_integer().
 count(State, Filters) ->
-  maps:size(index_tags_get(State, Filters)).
+  index_size(index_tags_get(State, Filters)).
 
 -spec peers(state(), all | conn_filter() | [conn_filter()]) -> [id()].
 peers(State, Filters) ->
   #{connections := Conns} = State,
   [maps:get(peer, maps:get(R, Conns))
-   || R <- maps:keys(index_tags_get(State, Filters))].
+   || R <- index_keys(index_tags_get(State, Filters))].
 
 -spec status(state(), conn_ref()) -> conn_status() | undefined.
 status(State, ConnRef) ->
@@ -123,11 +123,11 @@ peer(State, ConnRef) ->
 
 -spec peer_connections(state(), id()) -> [conn_ref()].
 peer_connections(State, PeerId) ->
-  maps:keys(index_peers_get(State, PeerId)).
+  index_keys(index_peers_get(State, PeerId)).
 
 -spec has_connection(state(), id()) -> boolean().
 has_connection(State, PeerId) ->
-  maps:is_key(PeerId, index_peers_get(State, PeerId)).
+  index_has_key(PeerId, index_peers_get(State, PeerId)).
 
 -spec connect(state(), id(), context(), sim()) -> {state(), sim()}.
 connect(State, PeerId, Context, Sim) ->
@@ -217,7 +217,7 @@ get_connection(State, ConnRef) ->
 
 get_peer_connections(State, PeerId) ->
   #{connections := Conns} = State,
-  ConnRefs = maps:keys(index_peers_get(State, PeerId)),
+  ConnRefs = index_keys(index_peers_get(State, PeerId)),
   maps:values(maps:with(ConnRefs, Conns)).
 
 % Connection status and type shouldn't be changed; this doesn't update the index
@@ -245,7 +245,7 @@ del_connection(State, ConnRef) ->
   end.
 
 del_peer_connections(State, PeerId) ->
-  ConnRefs = maps:keys(index_peers_get(State, PeerId)),
+  ConnRefs = index_keys(index_peers_get(State, PeerId)),
   lists:foldl(fun(C, S) -> del_connection(S, C) end, State, ConnRefs).
 
 update_status(State, ConnRef, NewStatus) ->
@@ -323,20 +323,41 @@ on_closed(State, ConnRef, Context, Sim) ->
 
 %--- INDEX FUNCTIONS -----------------------------------------------------------
 
-% Only the keys of the returned map should be used
+%% Dialyzer don't like we call `is_map` on an opaque type
+-dialyzer({nowarn_function, index_keys/1}).
+-spec index_keys(sets:set() | map()) -> [term()].
+index_keys(Map) when is_map(Map) -> maps:keys(Map);
+index_keys(Set) -> sets:to_list(Set).
+
+%% Dialyzer don't like we call `is_map` on an opaque type
+-dialyzer({nowarn_function, index_size/1}).
+-spec index_size(sets:set() | map()) -> non_neg_integer().
+index_size(Map) when is_map(Map) -> maps:size(Map);
+index_size(Set) -> sets:size(Set).
+
+%% Dialyzer don't like we call `is_map` on an opaque type
+-dialyzer({nowarn_function, index_has_key/2}).
+-spec index_has_key(term(), sets:set() | map()) -> boolean().
+index_has_key(Key, Map) when is_map(Map) -> maps:is_key(Key, Map);
+index_has_key(Key, Set) -> sets:is_element(Key, Set).
+
+-spec index_tags_get(state(), all | conn_filter() | [conn_filter()]) -> sets:set() | map().
 index_tags_get(#{connections := Conns}, all) -> Conns;
+index_tags_get(State, [Filter]) ->
+  index_tags_get(State, Filter);
 index_tags_get(State, Filter) when is_atom(Filter) ->
   #{tag_indexes := Indexes} = State,
   #{Filter := Index} = Indexes,
   Index;
-index_tags_get(State, Filters) when is_list(Filters) ->
+index_tags_get(State, [Filter | Filters]) ->
   #{tag_indexes := Indexes} = State,
-  lists:foldl(fun(Filter, Acc) ->
-    #{Filter := Index} = Indexes,
-    maps:merge(Acc, Index)
-  end, #{}, Filters).
+  #{Filter := Index} = Indexes,
+  lists:foldl(fun(F, Acc) ->
+    #{F := I} = Indexes,
+    sets:intersection(Acc, I)
+  end, Index, Filters).
 
-% Only the keys of the returned map should be used
+-spec index_peers_get(state(), id()) -> sets:set().
 index_peers_get(State, PeerId) ->
   #{peer_index := Index} = State,
   case maps:find(PeerId, Index) of
@@ -360,16 +381,16 @@ index_connection_deleted(State, Conn) ->
 
 index_peers_add(State, ConnRef, PeerId) ->
   #{peer_index := Index} = State,
-  ConnIndex = maps:get(PeerId, Index, #{}),
-  ConnIndex2 = ConnIndex#{ConnRef => true},
+  ConnIndex = maps:get(PeerId, Index, sets:new()),
+  ConnIndex2 = sets:add_element(ConnRef, ConnIndex),
   Index2 = Index#{PeerId => ConnIndex2},
   State#{peer_index := Index2}.
 
 index_peers_del(State, ConnRef, PeerId) ->
   #{peer_index := Index} = State,
-  ConnIndex = maps:get(PeerId, Index, #{}),
-  ConnIndex2 = maps:remove(ConnRef, ConnIndex),
-  Index2 = case maps:size(ConnIndex2) of
+  ConnIndex = maps:get(PeerId, Index, sets:new()),
+  ConnIndex2 = sets:del_element(ConnRef, ConnIndex),
+  Index2 = case sets:size(ConnIndex2) of
     0 -> maps:remove(PeerId, Index);
     _ -> Index#{PeerId => ConnIndex2}
   end,
@@ -379,20 +400,20 @@ index_tags_update(State, _ConnRef, SameKey, SameKey) -> State;
 index_tags_update(State, ConnRef, Key, undefined) ->
   #{tag_indexes := Indexes} = State,
   #{Key := Index} = Indexes,
-  Index2 = maps:remove(ConnRef, Index),
+  Index2 = sets:del_element(ConnRef, Index),
   Indexes2 = Indexes#{Key := Index2},
   State#{tag_indexes := Indexes2};
 index_tags_update(State, ConnRef, undefined, Key) ->
   #{tag_indexes := Indexes} = State,
   #{Key := Index} = Indexes,
-  Index2 = Index#{ConnRef => true},
+  Index2 = sets:add_element(ConnRef, Index),
   Indexes2 = Indexes#{Key := Index2},
   State#{tag_indexes := Indexes2};
 index_tags_update(State, ConnRef, OldKey, NewKey) ->
   #{tag_indexes := Indexes} = State,
   #{OldKey := OldIndex, NewKey := NewIndex} = Indexes,
-  OldIndex2 = maps:remove(ConnRef, OldIndex),
-  NewIndex2 = NewIndex#{ConnRef => true},
+  OldIndex2 = sets:del_element(ConnRef, OldIndex),
+  NewIndex2 = sets:add_element(ConnRef, NewIndex),
   Indexes2 = Indexes#{OldKey := OldIndex2, NewKey := NewIndex2},
   State#{tag_indexes := Indexes2}.
 

@@ -16,7 +16,8 @@
 %=== TYPES =====================================================================
 
 -type opt_name() :: atom().
--type opt_type() :: string | integer | integer_infinity | atom | time | time_infinity.
+-type opt_type() :: string | integer | integer_infinity | atom | time
+                  | time_infinity | boolean.
 -type spec() :: {opt_name(), opt_type(), term()}.
 -type specs() :: [spec()].
 -type option() :: {opt_type(), boolean(), term(), term()}.
@@ -94,6 +95,14 @@ convert(string, _Key, Value) when is_list(Value) -> Value;
 convert(_Type, Key, "") -> error({bad_option, {Key, ""}});
 convert(atom, _Key, Value) when is_atom(Value) -> Value;
 convert(integer, _Key, Value) when is_integer(Value) -> Value;
+convert(boolean, _Key, "true") -> true;
+convert(boolean, _Key, "false") -> false;
+convert(boolean, _Key, "1") -> true;
+convert(boolean, _Key, "0") -> false;
+convert(boolean, _Key, true) -> true;
+convert(boolean, _Key, false) -> false;
+convert(boolean, _Key, 1) -> true;
+convert(boolean, _Key, 0) -> false;
 convert(integer_infinity, _Key, Value) when is_integer(Value) -> Value;
 convert(integer_infinity, _Key, infinity) -> infinity;
 convert(integer_infinity, _Key, "infinity") -> infinity;

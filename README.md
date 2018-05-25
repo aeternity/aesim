@@ -30,6 +30,14 @@ e.g.
   - `1h`: 3600000 milliseconds
   - `2m10s42` : 130042 milliseconds
 
+Metrics
+-------
+
+To generate graphics for the simulation metrics you need `rrdtool` installed.
+You can enable it by passing the option:
+
+  `$ _build/default/bin/aesim rrd_enable=true`
+
 Simulation Scenarios
 --------------------
 
