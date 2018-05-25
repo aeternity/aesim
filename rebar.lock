@@ -4,9 +4,11 @@
        {ref,"9c3f98403354a4f0bec3582f69b513364306ff9a"}},
   0},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
- {<<"lager">>,{pkg,<<"lager">>,<<"3.6.2">>},0}]}.
+ {<<"lager">>,
+  {git,"https://github.com/aeternity/lager.git",
+       {ref,"295d6031ede2a052b87653090789150458837bbd"}},
+  0}]}.
 [
 {pkg_hash,[
- {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
- {<<"lager">>, <<"2C72950A0E75FFD927DD35BC85EA30E7680A264C4BBD08B328250871AC456CC2">>}]}
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>}]}
 ].
