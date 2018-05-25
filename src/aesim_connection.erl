@@ -7,10 +7,10 @@
 
 %=== BEHAVIOUR DEFINITION ======================================================
 
--callback parse_options(Config, Opts)
-  -> Config
-  when Config :: map(),
-       Opts :: map().
+-callback parse_options(Opts, Sim)
+  -> Sim
+  when Opts :: map(),
+       Sim :: sim().
 
 -callback conn_new(Context, Sim)
   -> {State, Sim}
@@ -30,6 +30,13 @@
   -> {accept, State, Delay, Sim} | {reject, Delay, Sim}
   when State :: term(),
        Opts :: term(),
+       Context :: context(),
+       Sim :: sim(),
+       Delay :: delay().
+
+-callback conn_reject(State, Context, Sim)
+  -> {Delay, Sim}
+  when State :: term(),
        Context :: context(),
        Sim :: sim(),
        Delay :: delay().

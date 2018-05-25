@@ -10,6 +10,8 @@
 %% API functions
 -export([parse_options/2]).
 -export([new/1]).
+-export([trusted/1]).
+-export([reduce/3]).
 -export([count/1]).
 -export([bootstrap/2]).
 -export([start_node/2]).
@@ -39,13 +41,14 @@
 
 %=== API FUNCTIONS =============================================================
 
--spec parse_options(map(), map()) -> map().
-parse_options(Config, Opts) ->
-  Config2 = Config#{
-    bootstrap_size => maps:get(bootstrap_size, Opts, ?DEFAULT_BOOTSTRAP_SIZE),
-    trusted_count => maps:get(trusted_count, Opts, ?DEFAULT_TRUSTED_COUNT)
-  },
-  aesim_node:parse_options(Config2, Opts).
+-spec parse_options(map(), sim()) -> sim().
+parse_options(Opts, Sim) ->
+  aesim_config:parse(Sim, Opts, [
+    {bootstrap_size, integer, ?DEFAULT_BOOTSTRAP_SIZE},
+    {trusted_count, integer, ?DEFAULT_TRUSTED_COUNT}
+  ], [
+    fun aesim_node:parse_options/2
+  ]).
 
 -spec new(sim()) -> {state(), sim()}.
 new(Sim) ->
@@ -56,6 +59,13 @@ new(Sim) ->
     nodes => #{}
   },
   {State, Sim}.
+
+trusted(#{trusted := Trusted}) -> Trusted.
+
+-spec reduce(state(), fun((id(), aesim_node:state(), term()) -> term()), term()) -> term().
+reduce(State, Fun, Acc) ->
+  #{nodes := Nodes} = State,
+  maps:fold(Fun, Acc, Nodes).
 
 -spec count(state()) -> non_neg_integer().
 count(#{nodes := Nodes}) -> maps:size(Nodes).
@@ -137,12 +147,13 @@ node_add(State, Sim) ->
   {State2, NextId, Addr, Sim2}.
 
 node_start(State, NodeId, Sim) ->
+  Sim2 = aesim_metrics:inc([nodes, count], 1, Sim),
   #{nodes := Nodes, trusted := AllTrusted} = State,
   #{NodeId := Node} = Nodes,
   Trusted = [{Id, Addr} || {Id, Addr} <- AllTrusted, Id =/= NodeId],
-  {Node2, Sim2} = aesim_node:start(Node, Trusted, Sim),
+  {Node2, Sim3} = aesim_node:start(Node, Trusted, Sim2),
   Nodes2 = Nodes#{NodeId := Node2},
-  {State#{nodes := Nodes2}, Sim2}.
+  {State#{nodes := Nodes2}, Sim3}.
 
 %--- PRIVATE EVENT FUNCTIONS ---------------------------------------------------
 
@@ -151,6 +162,6 @@ post(Delay, Name, Params, Sim) ->
 
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
-cfg_bootstrap_size(Config) -> aesim_config:get(Config, bootstrap_size).
+cfg_bootstrap_size(Sim) -> aesim_config:get(Sim, bootstrap_size).
 
-cfg_trusted_count(Config) -> aesim_config:get(Config, trusted_count).
+cfg_trusted_count(Sim) -> aesim_config:get(Sim, trusted_count).

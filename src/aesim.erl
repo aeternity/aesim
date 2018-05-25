@@ -14,6 +14,8 @@
 main(Args) ->
     start_simulator(Args).
 
+%% Dialyzer don't like we create an anonymous function that doesn't return
+-dialyzer({nowarn_function, start/2}).
 start(_StartType, StartArgs) ->
   {ok, spawn(fun() -> start_simulator(StartArgs) end)}.
 

@@ -30,6 +30,8 @@
   sched := gb_trees:tree(event_ref(), event())
 }.
 
+-export_type([state/0]).
+
 %=== API FUNCTIONS =============================================================
 
 -spec new() -> state().
@@ -70,7 +72,7 @@ size(#{events := State}) ->
   #{queue_size := Size, sched := Events} = State,
   Size + gb_trees:size(Events).
 
--spec next(sim()) -> empty | {sim_time(), event_addr(), event_name(), term(), sim()}.
+-spec next(sim()) -> {empty, sim()} | {sim_time(), event_addr(), event_name(), term(), sim()}.
 next(Sim) ->
   #{time := Time, events := State} = Sim,
   case take_queued(State) of
@@ -78,7 +80,7 @@ next(Sim) ->
       {Time, Target, Name, Params, Sim#{events := State2}};
     empty ->
       case take_scheduled(State) of
-        empty -> empty;
+        empty -> {empty, Sim};
         {State2, EventTime, Target, Name, Params} ->
           {EventTime, Target, Name, Params, Sim#{events := State2}}
       end
@@ -92,19 +94,19 @@ print_summary(Sim) -> dump_summary(#{}, next(Sim)).
 
 %=== INTERNAL FUNCTIONS ========================================================
 
-dump_events(empty) -> ok;
+dump_events({empty, _Sim}) -> ok;
 dump_events({NextTime, EAddr, EName, _Params, Sim}) ->
   TimeStr = aesim_utils:format_time(NextTime),
-  aesim_utils:print("~13s ~-13s ~w~n", [TimeStr, EName, EAddr]),
+  aesim_simulator:print("~13s ~-13s ~w~n", [TimeStr, EName, EAddr], Sim),
   dump_events(next(Sim)).
 
 dump_summary(Acc, {_NextTime, EAddr, EName, _Params, Sim}) ->
   {C, Ts} = maps:get(EName, Acc, {0, #{}}),
   dump_summary(Acc#{EName => {C + 1, Ts#{EAddr => true}}}, next(Sim));
-dump_summary(Acc, empty) ->
+dump_summary(Acc, {empty, Sim}) ->
   lists:foreach(fun({N, {C, Ts}}) ->
-    aesim_utils:print("~-13s : ~6b event(s) for ~4b target(s)~n",
-                      [N, C, maps:size(Ts)])
+    aesim_simulator:print("~-13s : ~6b event(s) for ~4b target(s)~n",
+                          [N, C, maps:size(Ts)], Sim)
   end, maps:to_list(Acc)).
 
 queue_event(State, Target, Name, Params) ->

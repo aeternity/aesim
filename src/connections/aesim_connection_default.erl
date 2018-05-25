@@ -16,6 +16,7 @@
 -export([conn_new/2]).
 -export([conn_connect/3]).
 -export([conn_accept/4]).
+-export([conn_reject/3]).
 -export([conn_disconnect/3]).
 -export([conn_handle_event/5]).
 
@@ -28,8 +29,8 @@
 
 %=== BEHAVIOUR aesim_connection CALLBACK FUNCTIONS =============================
 
-parse_options(Config, Opts) ->
-  aesim_config:parse(Config, Opts, [
+parse_options(Opts, Sim) ->
+  aesim_config:parse(Sim, Opts, [
     {connect_delay, integer, ?DEFAULT_CONNECT_DELAY},
     {accept_delay, integer, ?DEFAULT_ACCEPT_DELAY},
     {reject_delay, integer, ?DEFAULT_REJECT_DELAY},
@@ -45,6 +46,9 @@ conn_connect(State, _Context, Sim) ->
 conn_accept(State, _Opts, _Context, Sim) ->
   {accept, State, cfg_accept_delay(Sim), Sim}.
 
+conn_reject(_State, _Context, Sim) ->
+  {cfg_reject_delay(Sim), Sim}.
+
 conn_disconnect(_State, _Context, Sim) ->
   {cfg_disconnect_delay(Sim), Sim}.
 
@@ -54,10 +58,10 @@ conn_handle_event(_State, _Name, _Params, _Context, _Sim) -> ignore.
 
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
-cfg_connect_delay(Config) -> aesim_config:get(Config, connect_delay).
+cfg_connect_delay(Sim) -> aesim_config:get(Sim, connect_delay).
 
-cfg_accept_delay(Config) -> aesim_config:get(Config, accept_delay).
+cfg_accept_delay(Sim) -> aesim_config:get(Sim, accept_delay).
 
-% cfg_reject_delay(Config) -> aesim_config:get(Config, reject_delay).
+cfg_reject_delay(Sim) -> aesim_config:get(Sim, reject_delay).
 
-cfg_disconnect_delay(Config) -> aesim_config:get(Config, disconnect_delay).
+cfg_disconnect_delay(Sim) -> aesim_config:get(Sim, disconnect_delay).
