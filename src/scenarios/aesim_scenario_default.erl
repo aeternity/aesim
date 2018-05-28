@@ -25,10 +25,8 @@
 -export([parse_options/2]).
 -export([scenario_new/1]).
 -export([scenario_start/3]).
--export([scenario_has_terminated/3]).
--export([scenario_progress/3]).
 -export([scenario_report/4]).
--export([scenario_handle_event/5]).
+-export([scenario_handle_event/6]).
 
 %=== MACROS ====================================================================
 
@@ -51,19 +49,18 @@ scenario_start(State, Nodes, Sim) ->
   {_, Sim3} = sched_start_node(CurrCount, Sim2),
   {State, Nodes2, Sim3}.
 
-scenario_has_terminated(_State, _Nodes, _Sim) -> false.
-
-scenario_progress(State, Nodes, Sim) ->
-  aesim_scenario:default_progress(Nodes, Sim),
-  {State, Sim}.
-
 scenario_report(_State, Reason, Nodes, Sim) ->
   aesim_scenario:default_report(Reason, Nodes, Sim),
-  aesim_simulator:print_separator(Sim).
+  aesim_simulator:print_separator(Sim),
+  % Timeing out is not an error in this scenario
+  case lists:member(Reason, [sim_timeout, real_timeout]) of
+    true -> normal;
+    false -> Reason
+  end.
 
-scenario_handle_event(State, start_node, Count, Nodes, Sim) ->
+scenario_handle_event(State, _, start_node, Count, Nodes, Sim) ->
   do_start_node(State, Count, Nodes, Sim);
-scenario_handle_event(_State, _EventName, _Params, _Nodes, _Sim) -> ignore.
+scenario_handle_event(_State, _, _EventName, _Params, _Nodes, _Sim) -> ignore.
 
 %=== INTERNAL FUNCTIONS ========================================================
 
@@ -76,7 +73,7 @@ do_start_node(State, Count, Nodes, Sim) ->
   case Count < cfg_max_nodes(Sim) of
     false -> ignore;
     true ->
-      {Nodes2, Sim2} = aesim_nodes:start_node(Nodes, Sim),
+      {Nodes2, _, Sim2} = aesim_nodes:start_node(Nodes, Sim),
       {_, Sim3} = sched_start_node(Count +1, Sim2),
       {State, Nodes2, Sim3}
   end.

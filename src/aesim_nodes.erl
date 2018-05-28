@@ -16,6 +16,7 @@
 -export([bootstrap/2]).
 -export([start_node/2]).
 -export([report/3]).
+-export([node_report/4]).
 
 %% API functions for callback modules
 -export([sched_start_node/2]).
@@ -90,10 +91,11 @@ bootstrap(State, Sim) ->
     node_start(St, NodeId, Sm)
   end, {State3, Sim2}, Neighbours).
 
--spec start_node(state(), sim()) -> {state(), sim()}.
+-spec start_node(state(), sim()) -> {state(), id(), sim()}.
 start_node(State, Sim) ->
   {State2, NodeId, _NodeAddr,Sim2} = node_add(State, Sim),
-  node_start(State2, NodeId, Sim2).
+  {State3, Sim3} = node_start(State2, NodeId, Sim2),
+  {State3, NodeId, Sim3}.
 
 -spec report(state(), report_type(), sim()) -> map().
 report(State, Type, Sim) ->
@@ -105,6 +107,12 @@ report(State, Type, Sim) ->
   #{node_count => count(State),
     connection_count => ConnCount,
     nodes => NodeReports}.
+
+-spec node_report(state(), id(), report_type(), sim()) -> map().
+node_report(State, NodeId, Type, Sim) ->
+  #{nodes := Nodes} = State,
+  #{NodeId := Node} = Nodes,
+  aesim_node:report(Node, Type, Sim).
 
 %--- API FUNCTIONS FOR CALLBACK MODULES ----------------------------------------
 

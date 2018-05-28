@@ -8,11 +8,13 @@
 
 -export([format/2]).
 -export([format_time/1]).
+-export([format_minimal_time/1]).
 -export([rand/1, rand/2]).
 -export([rand_take/1, rand_take/2]).
 -export([rand_pick/1, rand_pick/2, rand_pick/3]).
 -export([list_add_new/2]).
 -export([reduce_metric/1]).
+-export([sum/1]).
 
 %=== API FUNCTIONS =============================================================
 
@@ -27,6 +29,19 @@ format_time(Miliseconds) ->
   Hour = Min div 60,
   Args = [Hour, Min rem 60, Sec rem 60, Miliseconds rem 1000],
   format("~bh~2.10.0bm~2.10.0bs~3.10.0b", Args).
+
+-spec format_minimal_time(non_neg_integer()) -> string().
+format_minimal_time(Miliseconds) ->
+  Sec = Miliseconds div 1000,
+  Min = Sec div 60,
+  Hour = Min div 60,
+  Parts = [{"", Miliseconds rem 1000}, {"s", Sec rem 60},
+           {"m", Min rem 60}, {"h", Hour}],
+  IoList = lists:foldl(fun
+    ({_Postfix, 0}, Acc) -> Acc;
+    ({Postfix, Value}, Acc) -> [integer_to_list(Value), Postfix | Acc]
+  end, [], Parts),
+  lists:flatten(IoList).
 
 %% Returns X where 0 <= X < N
 -spec rand(non_neg_integer()) -> non_neg_integer().
@@ -84,6 +99,10 @@ reduce_metric([_|_] = Values) ->
   Avg = round(Total / Count),
   Median = lists:nth(max(Count div 2, 1), lists:sort(Values)),
   {Min, Avg, Median, Max}.
+
+-spec sum([integer()]) -> integer().
+sum(Values) ->
+  lists:foldl(fun(V, Acc) -> Acc + V end, 0, Values).
 
 %=== INTERNAL FUNCTIONS ========================================================
 

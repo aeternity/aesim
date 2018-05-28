@@ -69,7 +69,8 @@ pool_handle_event(State, peer_expired, PeerId, Context, Sim) ->
 pool_handle_event(_State, _Name, _Params, _Context, _Sim) -> ignore.
 
 report(State, _Type, _Context, _Sim) ->
-  #{verified_count => maps:size(State),
+  #{known_count => maps:size(State),
+    verified_count => maps:size(State),
     unverified_count => 0}.
 
 %=== INTERNAL FUNCTIONS ========================================================
@@ -79,8 +80,9 @@ add_verified(State, PeerId, Context, Sim) ->
     {ok, _} -> State;
     error ->
       #{node_id := NodeId} = Context,
-      Sim2 = aesim_metrics:inc(NodeId, [pool, verified], 1, Sim),
-      {State#{PeerId => true}, Sim2}
+      Sim2 = aesim_metrics:inc(NodeId, [pool, known], 1, Sim),
+      Sim3 = aesim_metrics:inc(NodeId, [pool, verified], 1, Sim2),
+      {State#{PeerId => true}, Sim3}
   end.
 
 del_verified(State, PeerId, Context, Sim) ->
@@ -88,8 +90,9 @@ del_verified(State, PeerId, Context, Sim) ->
     error -> ignore;
     {ok, _} ->
       #{node_id := NodeId} = Context,
-      Sim2 = aesim_metrics:inc(NodeId, [pool, verified], -1, Sim),
-      {maps:remove(PeerId, State), Sim2}
+      Sim2 = aesim_metrics:inc(NodeId, [pool, known], -1, Sim),
+      Sim3 = aesim_metrics:inc(NodeId, [pool, verified], -1, Sim2),
+      {maps:remove(PeerId, State), Sim3}
   end.
 
 %% Filter out the peers that are waiting for retrying and schedule peer removal
