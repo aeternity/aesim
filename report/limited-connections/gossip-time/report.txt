@@ -1,0 +1,194 @@
+### CONFIGURATION ##############################################################
+accept_delay        :                             50 integer           (default)
+bootstrap_size      :                              3 integer           (default)
+conn_mod            :       aesim_connection_default atom              (default)
+connect_delay       :                            100 integer           (default)
+connect_period      :                              0 integer_infinity  (default)
+disconnect_delay    :                             50 integer           (default)
+first_ping_delay    :                            100 time              (default)
+gossip_percent      :                             90 integer           (default)
+gossiped_neighbours :                             30 integer           (default)
+max_inbound         :                           1000 integer_infinity           
+max_nodes           :                            320 integer                    
+max_outbound        :                             10 integer_infinity           
+max_real_time       :                       infinity time_infinity     (default)
+max_sim_time        :                             4h time_infinity              
+node_mod            :             aesim_node_default atom              (default)
+node_start_period   :                            30s time              (default)
+ping_period         :                             2m time              (default)
+pong_delay          :                            100 time              (default)
+pool_mod            :              aesim_pool_simple atom              (default)
+progress_interval   :                             1s time              (default)
+reject_delay        :                             50 integer           (default)
+reject_iprob        :                       infinity integer_infinity  (default)
+rrd_enabled         :                          false boolean           (default)
+scenario_mod        :     aesim_scenario_gossip_time atom                       
+trusted_count       :                              2 integer           (default)
+### SIMULATION #################################################################
+### PHASE  1 START : cluster_setup
+### Starting cluster nodes
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     16%   0h00m01s000   0h39m30s900      2371x      2371x    83     807     808
+     22%   0h00m02s000   0h53m02s200       811x      1591x   110    1077    1078
+     26%   0h00m03s000   1h03m02s900       601x      1261x   130    1277    1278
+     29%   0h00m04s000   1h11m30s600       508x      1073x   147    1447    1448
+     32%   0h00m05s000   1h18m31s000       420x       942x   161    1587    1588
+     35%   0h00m06s000   1h24m32s600       362x       845x   173    1707    1708
+     37%   0h00m07s006   1h30m03s100       329x       771x   184    1817    1818
+     39%   0h00m08s006   1h35m03s200       300x       712x   194    1917    1918
+     41%   0h00m09s006   1h39m35s000       272x       663x   203    2007    2008
+     43%   0h00m10s006   1h44m04s300       269x       624x   212    2097    2098
+     45%   0h00m11s011   1h48m05s200       240x       589x   220    2177    2178
+     46%   0h00m12s011   1h52m03s600       238x       560x   228    2257    2258
+     48%   0h00m13s011   1h56m00s350       237x       535x   236    2329    2331
+     49%   0h00m14s011   1h59m04s200       184x       510x   242    2397    2398
+     51%   0h00m15s011   2h02m32s200       208x       490x   249    2467    2468
+     52%   0h00m16s011   2h05m33s800       182x       471x   255    2527    2528
+     53%   0h00m17s011   2h08m34s600       181x       454x   261    2587    2588
+     54%   0h00m18s011   2h11m35s300       181x       438x   267    2647    2649
+     56%   0h00m19s011   2h14m34s100       179x       425x   273    2707    2708
+     57%   0h00m20s011   2h17m31s700       178x       412x   279    2767    2768
+     58%   0h00m21s011   2h20m04s500       153x       400x   284    2817    2818
+     59%   0h00m22s011   2h22m36s900       152x       389x   289    2867    2868
+     60%   0h00m23s011   2h25m31s500       175x       379x   295    2927    2929
+### PHASE  1 DONE  : 2h28m00s000
+################################################################################
+### PHASE  2 START : cluster_gossip
+### Waiting for nodes to know each others
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     61%   0h00m24s011   2h28m01s300       150x       370x   300    2977    2977
+### PHASE  2 DONE  : 0h02m12s000
+################################################################################
+### PHASE  3 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     62%   0h00m25s011   2h30m32s600       151x       361x   301    2987    2988
+     63%   0h00m26s011   2h33m03s200       151x       353x   301    2987    2987
+### PHASE  3 DONE  : 0h04m17s400
+################################################################################
+### PHASE  4 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     64%   0h00m27s011   2h35m35s100       152x       346x   302    2997    2997
+### PHASE  4 DONE  : 0h02m02s600
+################################################################################
+### PHASE  5 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     65%   0h00m28s011   2h38m06s000       151x       339x   303    3007    3007
+### PHASE  5 DONE  : 0h04m00s600
+################################################################################
+### PHASE  6 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     66%   0h00m29s011   2h40m36s800       151x       332x   304    3017    3017
+### PHASE  6 DONE  : 0h02m01s000
+################################################################################
+### PHASE  7 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     67%   0h00m30s011   2h43m07s600       151x       326x   305    3027    3027
+### PHASE  7 DONE  : 0h02m01s000
+################################################################################
+### PHASE  8 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     69%   0h00m31s011   2h46m01s150       174x       321x   306    3037    3037
+### PHASE  8 DONE  : 0h02m01s000
+################################################################################
+### PHASE  9 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     70%   0h00m32s011   2h48m08s700       128x       315x   307    3047    3047
+### PHASE  9 DONE  : 0h02m01s000
+################################################################################
+### PHASE 10 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+### PHASE 10 DONE  : 0h02m01s000
+################################################################################
+### PHASE 11 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     71%   0h00m33s011   2h50m37s900       149x       310x   309    3059    3059
+     72%   0h00m34s011   2h53m08s600       151x       305x   309    3067    3067
+### PHASE 11 DONE  : 0h04m00s600
+################################################################################
+### PHASE 12 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     73%   0h00m35s011   2h55m38s700       150x       301x   310    3077    3077
+     74%   0h00m36s011   2h58m08s100       149x       297x   310    3077    3077
+### PHASE 12 DONE  : 0h04m00s600
+################################################################################
+### PHASE 13 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     75%   0h00m37s011   3h00m37s600       150x       293x   311    3087    3087
+### PHASE 13 DONE  : 0h04m00s600
+################################################################################
+### PHASE 14 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     76%   0h00m38s011   3h03m07s900       150x       289x   312    3097    3097
+     77%   0h00m39s011   3h05m37s900       150x       286x   312    3097    3097
+### PHASE 14 DONE  : 0h04m00s600
+################################################################################
+### PHASE 15 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     78%   0h00m40s011   3h08m06s400       149x       282x   313    3107    3107
+### PHASE 15 DONE  : 0h02m01s000
+################################################################################
+### PHASE 16 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     79%   0h00m41s011   3h10m36s400       150x       279x   314    3117    3117
+### PHASE 16 DONE  : 0h04m21s000
+################################################################################
+### PHASE 17 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     80%   0h00m42s011   3h13m04s600       148x       276x   315    3127    3127
+     81%   0h00m43s011   3h15m33s800       149x       273x   315    3127    3127
+### PHASE 17 DONE  : 0h04m02s000
+################################################################################
+### PHASE 18 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     82%   0h00m44s011   3h17m39s800       126x       269x   316    3137    3137
+     83%   0h00m45s011   3h20m09s000       149x       267x   316    3137    3137
+### PHASE 18 DONE  : 0h04m00s600
+################################################################################
+### PHASE 19 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     84%   0h00m46s011   3h22m37s100       148x       264x   317    3147    3147
+     85%   0h00m47s011   3h25m04s400       147x       262x   317    3147    3148
+### PHASE 19 DONE  : 0h04m00s600
+################################################################################
+### PHASE 20 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     86%   0h00m48s011   3h27m10s600       126x       259x   318    3157    3157
+### PHASE 20 DONE  : 0h04m00s600
+################################################################################
+### PHASE 21 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     87%   0h00m49s011   3h29m38s000       147x       257x   319    3167    3167
+     88%   0h00m50s011   3h32m05s600       148x       254x   319    3167    3167
+### PHASE 21 DONE  : 0h04m00s600
+################################################################################
+### PHASE 22 START : node_gossip
+### Waiting for reference node to know enough of the cluster
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     89%   0h00m51s011   3h34m10s600       125x       252x   320    3177    3177
+     90%   0h00m52s011   3h36m37s900       147x       250x   320    3177    3177
+### PHASE 22 DONE  : 0h04m01s000
+################################################################################
+### SCENARIO RESULTS ###########################################################
+DESCRIPTION                             MINIMUM    AVERAGE     MEDIAN    MAXIMUM
+Time to know 90% of the cluster            2m1s   3m20s770      4m600      4m21s
+################################################################################
+### SIMULATION DONE : normal ###################################################
+################################################################################
