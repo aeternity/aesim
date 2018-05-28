@@ -32,8 +32,8 @@
 -define(UPDATE_INTERVAL, (60 * 1000)). % 1 minute
 -define(METRICS_DIR, "metrics").
 -define(RRD_FILE, "metrics.rrd").
--define(INDEX_FILE, "metrics.html").
--define(RDD_IMAGE_DIR, "images").
+-define(RRD_INDEX_FILE, "metrics.html").
+-define(RRD_IMAGE_DIR, "images").
 
 -define(RRD_GRAPH_WIDTH, 1000).
 -define(RRD_GRAPH_HEIGHT, 300).
@@ -59,30 +59,36 @@
   [connections, rejected],
   [connections, accepted],
   [connections, failed],
+  [connections, retry],
   [connections, established],
   [connections, disconnect],
   [connections, terminated, inbound],
   [connections, terminated, outbound],
   [connections, pruned],
+  [peers, expired],
   [gossip, received],
   [pool, verified]
 ]).
 
--define(RDD_GRAPHS, [
+-define(RRD_GRAPHS, [
   #{title => "Running Nodes",
     defs => {simple, "nodes", #{}}},
   #{title => "Inbound Connections per Node",
     defs => {collection, "conns_in", #{}}},
   #{title => "Outbound Connections per Node",
     defs => {collection, "conns_out", #{}}},
-  #{title => "Failed Connections per Node",
-    defs => {collection, "failed", #{}}},
   #{title => "Pruned Connections per Node",
     defs => {collection, "pruned", #{}}},
   #{title => "Gossip Updates Received per Node",
     defs => {collection, "gossiped", #{}}},
   #{title => "Pooled Verified Peers per Node",
-    defs => {collection, "verified", #{}}}
+    defs => {collection, "verified", #{}}},
+  #{title => "Failed Connections per Node",
+    defs => {collection, "failed", #{}}},
+  #{title => "Retried Connections per Node",
+    defs => {collection, "retry", #{}}},
+  #{title => "Expired Peers per Node",
+    defs => {collection, "expired", #{}}}
 ]).
 
 %=== TYPES =====================================================================
@@ -209,6 +215,7 @@ new_metrics() -> #{}.
 metrics_inc(Metrics, Name, Inc) ->
   Current = maps:get(Name, Metrics, 0),
   New = Current + Inc,
+  ?assert(New >= 0),
   Metrics#{Name => New}.
 
 metrics_get(Metrics, Name) ->
@@ -234,6 +241,7 @@ k2i([connections, connect]) ->              {collection, gauge, "connect"};
 k2i([connections, rejected]) ->             {collection, gauge, "rejected"};
 k2i([connections, accepted]) ->             {collection, gauge, "accepted"};
 k2i([connections, failed]) ->               {collection, gauge, "failed"};
+k2i([connections, retry]) ->                {collection, gauge, "retry"};
 k2i([connections, established]) ->          {collection, gauge, "established"};
 k2i([connections, disconnect]) ->           {collection, gauge, "disconnect"};
 k2i([connections, terminated, inbound]) ->  {collection, gauge, "closed_in"};
@@ -241,6 +249,7 @@ k2i([connections, terminated, outbound]) -> {collection, gauge, "closed_out"};
 k2i([connections, pruned]) ->               {collection, gauge, "pruned"};
 k2i([gossip, received]) ->                  {collection, gauge, "gossiped"};
 k2i([pool, verified]) ->                    {collection, gauge, "verified"};
+k2i([peers, expired]) ->                    {collection, gauge, "expired"};
 k2i(_) ->                                   undefined.
 
 rrd_setup(Sim) ->
@@ -273,13 +282,15 @@ rrd_print_report(Sim) ->
   #{metrics := State, max_sim_time := MaxTime} = Sim,
   #{rrd_server := Server, rrd_start_time := Start, rrd_dir := RRDDir} = State,
   End = Start + MaxTime div 1000,
-  ok = filelib:ensure_dir(filename:join([RRDDir, ?RDD_IMAGE_DIR, "dummy"])),
-  aesim_simulator:print_title("METRICS GRAPHICS", Sim),
+  ok = filelib:ensure_dir(filename:join([RRDDir, ?RRD_IMAGE_DIR, "dummy"])),
+  RRDFilePath = filename:join(RRDDir, ?RRD_FILE),
+  aesim_simulator:print_title("METRICS GRAPHS", Sim),
+  aesim_simulator:print("DATABASE: ~s~n", [RRDFilePath], Sim),
   aesim_simulator:print("RRDTOOL PARAMETERS: --start ~b --end ~b~n",
                        [Start, End], Sim),
   Images = lists:map(fun(Spec) ->
     rrd_generate_graph(Server, Spec, Start, End)
-  end, ?RDD_GRAPHS),
+  end, ?RRD_GRAPHS),
   IndexPath = rrd_generate_index(RRDDir, Images),
   aesim_simulator:print("INDEX: file://~s~n", [IndexPath], Sim),
   ok.
@@ -288,14 +299,14 @@ rrd_generate_graph(Server, Spec, Start, End) ->
   #{title := Title, defs := Defs} = Spec,
   case Defs of
     {simple, Name, _Opts} ->
-      Filename = filename:join(?RDD_IMAGE_DIR, Name ++ ".png"),
+      Filename = filename:join(?RRD_IMAGE_DIR, Name ++ ".png"),
       Command = rrd_graph_prefix(Filename, Title, Start, End)
              ++ rrd_graph_def(Name, undefined, average)
              ++ rrd_graph_line(Name, undefined, ?RRD_COLOR_SIMPLE, undefined),
       {ok, _} = errd_server:raw(Server, Command ++ "\n"),
       Filename;
     {collection, Name, _Opts} ->
-      Filename = filename:join(?RDD_IMAGE_DIR, Name ++ ".png"),
+      Filename = filename:join(?RRD_IMAGE_DIR, Name ++ ".png"),
       Command = rrd_graph_prefix(Filename, Title, Start, End)
              ++ rrd_graph_def(Name, "min", min)
              ++ rrd_graph_def(Name, "avg", last)
@@ -335,7 +346,7 @@ rrd_graph_line(Name, Potfix, Color, Label) ->
   aesim_utils:format("LINE2:~s~s:\"~s\" ", [Tag, Color, Label]).
 
 rrd_generate_index(Dir, Images) ->
-  IndexPath = filename:join(Dir, ?INDEX_FILE),
+  IndexPath = filename:join(Dir, ?RRD_INDEX_FILE),
   {ok, File} = file:open(IndexPath, [raw , write]),
   lists:foldl(fun(Path, Prefix) ->
     ok = file:write(File, Prefix),

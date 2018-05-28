@@ -65,14 +65,16 @@ node_new(AddrMap, _Context, Sim) ->
   State = #{inbound => 0, outbound => 0, connecting => false},
   {State, rand_address(AddrMap), Sim}.
 
+%% Connects to all trusted peers and starts periodical connection to pooled peers.
 node_start(State, Trusted, Context, Sim) ->
   TrustedIds = [I || {I, _} <- Trusted],
   {State2, Sim2} = lists:foldl(fun(P, {St, Sm}) ->
     {_, St2, Sm2} = maybe_connect(St, P, Context, Sm),
     {St2, Sm2}
   end, {State, Sim}, TrustedIds),
-  start_pool_connecting(State2, [], Context, Sim2).
+  start_pool_connecting(State2, Context, Sim2).
 
+%% Accepts all connections up to the configured maximum number of inbound connections.
 node_accept(State, PeerId, Context, Sim) ->
   case maybe_accept(State, PeerId, Context, Sim) of
     {true, State2, Sim2} -> {accept, State2, Sim2};
@@ -87,8 +89,8 @@ node_handle_event(State, conn_terminated, {PeerId, ConnRef, ConnType}, Context, 
   on_connection_terminated(State, PeerId, ConnRef, ConnType, Context, Sim);
 node_handle_event(State, peer_identified, PeerId, Context, Sim) ->
   on_peer_identified(State, PeerId, Context, Sim);
-node_handle_event(State, do_pool_connect, Exclude, Context, Sim) ->
-  do_pool_connect(State, Exclude, Context, Sim);
+node_handle_event(State, do_pool_connect, [], Context, Sim) ->
+  do_pool_connect(State, Context, Sim);
 node_handle_event(State, do_ping, ConnRef, Context, Sim) ->
   do_ping(State, ConnRef, Context, Sim);
 node_handle_event(State, do_pong, {ConnRef, Exclude}, Context, Sim) ->
@@ -103,7 +105,7 @@ node_handle_message(State, PeerId, ConnRef, Message, Context, Sim) ->
   #{node_id := NodeId} = Context,
   lager:warning("Unexpected message from node ~w to node ~w: ~p",
                 [PeerId, NodeId, Message]),
-  {_, Sim2} = aesim_node:async_disconnect(NodeId, ConnRef, Sim),
+  Sim2 = aesim_node:async_disconnect(NodeId, ConnRef, Sim),
   {State, Sim2}.
 
 report(_State, _Type, _Context, _Sim) -> #{}.
@@ -111,8 +113,8 @@ report(_State, _Type, _Context, _Sim) -> #{}.
 %=== INTERNAL FUNCTIONS ========================================================
 
 rand_address(AddrMap) ->
-  %% Here we could add some logic to ensure there is nodes with the same address
-  %% but with different ports.
+  %% Here we could add some logic to ensure there is nodes
+  %% with the same address but with different ports.
   O1 = aesim_utils:rand(256),
   O2 = aesim_utils:rand(256),
   O3 = aesim_utils:rand(256),
@@ -124,12 +126,14 @@ rand_address(AddrMap) ->
     false -> Addr
   end.
 
+%% Gets a list of peer from the pool.
 get_neighbours(Exclude, Context, Sim) ->
   #{pool := Pool, peers := Peers} = Context,
   Count = cfg_gossiped_neighbours(Sim),
   {PeerIds, Sim2} = aesim_pool:gossip(Pool, Count, Exclude, Context, Sim),
   {[{I, maps:get(addr, maps:get(I, Peers))} || I <- PeerIds], Sim2}.
 
+%% Selects a single connection from a list in a predictable way.
 select_connection(NodeId, PeerId, ConnRefs, Conns) ->
   %% Keep one of the connections initiated by the node with biggest id
   Initiatores = lists:map(fun(ConnRef) ->
@@ -141,40 +145,49 @@ select_connection(NodeId, PeerId, ConnRefs, Conns) ->
   [{_, SelRef} | Rest] = lists:keysort(1, Initiatores),
   {SelRef, [R || {_, R} <- Rest]}.
 
+%% Prunes the connection ot a given peer.
+%% One is selected and the other ones are disconnected.
 prune_connections(State, PeerId, ConnRef, Context, Sim) ->
   #{node_id := NodeId, conns := Conns} = Context,
   case aesim_connections:peer_connections(Conns, PeerId) of
     [_] -> {continue, State, Sim};
     ConnRefs ->
+      ?assert(length(ConnRefs) > 0),
       {SelRef, OtherRefs} = select_connection(NodeId, PeerId, ConnRefs, Conns),
       Sim2 = aesim_metrics:inc(NodeId, [connections, pruned], length(OtherRefs), Sim),
-      {_, Sim3} = aesim_node:async_disconnect(NodeId, OtherRefs, Sim2),
+      Sim3 = aesim_node:async_disconnect(NodeId, OtherRefs, Sim2),
       case SelRef =:= ConnRef of
         true -> {continue, State, Sim3};
         false -> {abort, State, Sim3}
       end
   end.
 
-start_pool_connecting(#{connecting := true} = State, _Exclude, _Context, Sim) ->
+%% Starts the periodic task that tries to connect to a peer taken froim the pool.
+start_pool_connecting(#{connecting := true} = State, _Context, Sim) ->
   % If we are already connecting, it may be possible we connect again to the
   % same peer because we are ignoring the exclusion list
   {State, Sim};
-start_pool_connecting(#{connecting := false} = State, Exclude, Context, Sim) ->
-  Sim2 = sched_pool_connect(Exclude, Context, Sim),
+start_pool_connecting(#{connecting := false} = State, Context, Sim) ->
+  Sim2 = sched_pool_connect(undefined, Context, Sim),
   {State#{connecting := true}, Sim2}.
 
-maybe_pool_connect(State, Exclude, Context, Sim) ->
+%% Connects to a peer selected from the pool if possible.
+%% The pool can respond with the next time a peer will be available due
+%% to the retry policy; it is used it to schedule the next try.
+maybe_pool_connect(State, Context, Sim) ->
+  #{time := Now} = Sim,
   #{pool := Pool, conns := Conns} = Context,
   ConnectedPeers = aesim_connections:peers(Conns, all),
-  %TODO: exclude peers in function of the retry counter
-  AllExclude = Exclude ++ ConnectedPeers,
-  case aesim_pool:select(Pool, AllExclude, Context, Sim) of
-    {undefined, Sim2} ->
+  case aesim_pool:select(Pool, ConnectedPeers, Context, Sim) of
+    {unavailable, Sim2} ->
       {false, State, Sim2};
-    {NewPeerId, Sim2} ->
+    {retry, NextTry, Sim2} ->
+      {true, NextTry - Now, State, Sim2};
+    {selected, NewPeerId, Sim2} ->
       maybe_connect(State, NewPeerId, Context, Sim2)
   end.
 
+%% Connects to a peer if the maximum number of outbound connections is not reached.
 maybe_connect(State, PeerId, Context, Sim) ->
   #{node_id := NodeId} = Context,
   #{outbound := CurrOutbound} = State,
@@ -186,6 +199,7 @@ maybe_connect(State, PeerId, Context, Sim) ->
         {false, State, Sim}
   end.
 
+%% Accept a peer connection if the maximum number of inbound connections is not reached.
 maybe_accept(State, _PeerId, _Context, Sim) ->
   #{inbound := CurrInbound} = State,
   case {cfg_max_inbound(Sim), CurrInbound} of
@@ -198,7 +212,7 @@ maybe_accept(State, _PeerId, _Context, Sim) ->
 
 connect(State, NodeId, PeerId, Sim) ->
   #{outbound := Outbound} = State,
-  {_, Sim2} = aesim_node:async_connect(NodeId, PeerId, Sim),
+  Sim2 = aesim_node:async_connect(NodeId, PeerId, Sim),
   {State#{outbound := Outbound + 1}, Sim2}.
 
 accept(State, Sim) ->
@@ -211,10 +225,15 @@ closed(State, Type, Sim) ->
 
 %--- EVENT FUNCTIONS -----------------------------------------------------------
 
-sched_pool_connect(Exclude, Context, Sim) ->
+sched_pool_connect(undefined, Context, Sim) ->
   #{self := Self} = Context,
   Delay = cfg_connect_period(Sim),
-  {_, Sim2} = aesim_events:post(Delay, Self, do_pool_connect, Exclude, Sim),
+  {_, Sim2} = aesim_events:post(Delay, Self, do_pool_connect, [], Sim),
+  Sim2;
+sched_pool_connect(MinDelay, Context, Sim) ->
+  #{self := Self} = Context,
+  Delay = max(MinDelay, cfg_connect_period(Sim)),
+  {_, Sim2} = aesim_events:post(Delay, Self, do_pool_connect, [], Sim),
   Sim2.
 
 sched_ping(true, ConnRef, Context, Sim) ->
@@ -234,21 +253,27 @@ sched_pong(ConnRef, Exclude, Context, Sim) ->
   {_, Sim2} = aesim_events:post(Delay, Self, do_pong, {ConnRef, Exclude}, Sim),
   Sim2.
 
-do_pool_connect(State, Exclude, Context, Sim) ->
-  case maybe_pool_connect(State, Exclude, Context, Sim) of
+%% Try connecting to a pooled peer and schedule the next try if relevent.
+do_pool_connect(State, Context, Sim) ->
+  case maybe_pool_connect(State, Context, Sim) of
     {false, State2, Sim2} ->
       % There is no peer available; stop connecting
       {State2#{connecting := false}, Sim2};
     {true, State2, Sim2} ->
-      Sim3 = sched_pool_connect([], Context, Sim2),
+      Sim3 = sched_pool_connect(undefined , Context, Sim2),
+      {State2, Sim3};
+    {true, MinDelay, State2, Sim2} ->
+      Sim3 = sched_pool_connect(MinDelay, Context, Sim2),
       {State2, Sim3}
   end.
 
+%% Prepares and send a ping message through a connection.
 do_ping(State, ConnRef, Context, Sim) ->
   #{node_addr := NodeAddr} = Context,
   {Neighbours, Sim2} = get_neighbours([], Context, Sim),
   {State, send_ping(ConnRef, NodeAddr, Neighbours, Context, Sim2)}.
 
+%% Prepares and sends a ping reponse message through a connection.
 do_pong(State, ConnRef, Exclude, Context, Sim) ->
   #{node_addr := NodeAddr} = Context,
   {Neighbours, Sim2} = get_neighbours(Exclude, Context, Sim),
@@ -259,14 +284,16 @@ on_peer_identified(State, PeerId, Context, Sim) ->
   % Given connection is asynchronous, it is still possible we already requested
   % to connect to the same peer; this will be resolved by connection pruning.
   case aesim_connections:has_connection(Conns, PeerId) of
-    false -> start_pool_connecting(State, [], Context, Sim);
+    false -> start_pool_connecting(State, Context, Sim);
     true -> ignore
   end.
 
-on_connection_failed(State, PeerId, Context, Sim) ->
+on_connection_failed(State, _PeerId, Context, Sim) ->
   {State2, Sim2} = closed(State, outbound, Sim),
-  start_pool_connecting(State2, [PeerId], Context, Sim2).
+  start_pool_connecting(State2, Context, Sim2).
 
+%% Prunes the connections, and send a ping message if it is an outbound connection.
+%% The connection may be aborted if the connection itself got pruned away.
 on_connection_established(State, PeerId, ConnRef, Type, Context, Sim) ->
   case {Type, prune_connections(State, PeerId, ConnRef, Context, Sim)} of
     {_, {abort, State2, Sim2}} -> {State2, Sim2};
@@ -278,9 +305,9 @@ on_connection_established(State, PeerId, ConnRef, Type, Context, Sim) ->
 
 on_connection_terminated(State, _PeerId, _ConnRef, inbound, _Context, Sim) ->
   closed(State, inbound, Sim);
-on_connection_terminated(State, PeerId, _ConnRef, outbound, Context, Sim) ->
+on_connection_terminated(State, _PeerId, _ConnRef, outbound, Context, Sim) ->
   {State2, Sim2} = closed(State, outbound, Sim),
-  start_pool_connecting(State2, [PeerId], Context, Sim2).
+  start_pool_connecting(State2, Context, Sim2).
 
 %--- MESSAGE FUNCTIONS ---------------------------------------------------------
 
@@ -294,18 +321,20 @@ send_pong(ConnRef, NodeAddr, Neighbours, Context, Sim) ->
   Message = {pong, NodeAddr, Neighbours},
   aesim_node:send(NodeId, ConnRef, Message, Sim).
 
+%% Handles ping messages and schedule a response.
 got_ping(State, PeerId, ConnRef, PeerAddr, Neighbours, Context, Sim) ->
   #{node_id := NodeId} = Context,
   Exclude = [PeerId | [I || {I, _} <- Neighbours]],
   Source = {PeerId, PeerAddr},
-  {_, Sim2} = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
+  Sim2 = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
   Sim3 = sched_pong(ConnRef, Exclude, Context, Sim2),
   {State, Sim3}.
 
+%% Handles ping message responses and schedule the next ping message.
 got_pong(State, PeerId, ConnRef, PeerAddr, Neighbours, Context, Sim) ->
   #{node_id := NodeId} = Context,
   Source = {PeerId, PeerAddr},
-  {_, Sim2} = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
+  Sim2 = aesim_node:async_gossip(NodeId, Source, Neighbours, Sim),
   Sim3 = sched_ping(false, ConnRef, Context, Sim2),
   {State, Sim3}.
 
