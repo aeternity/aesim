@@ -24,10 +24,10 @@ stop(_State) -> ok.
 %=== INTERNAL FUNCTIONS ========================================================
 
 start_simulator(Args) ->
-  aesim_simulator:run(parse_options(Args)),
-  timer:sleep(1000),
-  erlang:halt(0).
-
+  case aesim_simulator:run(parse_options(Args)) of
+    normal -> erlang:halt(0);
+    _ -> erlang:halt(1)
+  end.
 
 parse_options(Args) ->
   {ok, Regex} = re:compile("^([a-z][a-zA-Z0-9_]*)=(.*)$"),

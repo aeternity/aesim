@@ -6,7 +6,7 @@
 -type id() :: pos_integer().
 -type address() :: {inet:ip_address(), inet:port_number()}.
 -type address_map() :: #{address() => id()}.
--type termination_reason() :: error | frozen | normal.
+-type termination_reason() :: error | frozen | sim_timeout | real_timeout | normal.
 
 -type neighbour() :: {id(), address()}.
 -type neighbours() :: [neighbour()].
@@ -59,6 +59,8 @@
   time := sim_time(),
   max_sim_time := sim_time() | infinity,
   max_real_time := real_time() | infinity,
+  progress_counter := non_neg_integer(),
+  progress_phase := undefined | aesim_scenario:phase_tag(),
   progress_sim_time := sim_time(),
   progress_sim_interval := sim_time(),
   progress_real_time := real_time() | undefined, % should never be undefined

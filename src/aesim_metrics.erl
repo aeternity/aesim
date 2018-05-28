@@ -81,8 +81,8 @@
     defs => {collection, "pruned", #{}}},
   #{title => "Gossip Updates Received per Node",
     defs => {collection, "gossiped", #{}}},
-  #{title => "Pooled Verified Peers per Node",
-    defs => {collection, "verified", #{}}},
+  #{title => "Pooled Peers per Node",
+    defs => {collection, "known", #{}}},
   #{title => "Failed Connections per Node",
     defs => {collection, "failed", #{}}},
   #{title => "Retried Connections per Node",
@@ -248,7 +248,9 @@ k2i([connections, terminated, inbound]) ->  {collection, gauge, "closed_in"};
 k2i([connections, terminated, outbound]) -> {collection, gauge, "closed_out"};
 k2i([connections, pruned]) ->               {collection, gauge, "pruned"};
 k2i([gossip, received]) ->                  {collection, gauge, "gossiped"};
+k2i([pool, known]) ->                       {collection, gauge, "known"};
 k2i([pool, verified]) ->                    {collection, gauge, "verified"};
+k2i([pool, unverified]) ->                  {collection, gauge, "unverified"};
 k2i([peers, expired]) ->                    {collection, gauge, "expired"};
 k2i(_) ->                                   undefined.
 

@@ -39,9 +39,9 @@
 
 %=== MACROS ====================================================================
 
--define(DEFAULT_FIRST_PING_DELAY,          10).
+-define(DEFAULT_FIRST_PING_DELAY,         100).
 -define(DEFAULT_PING_PERIOD,             "2m").
--define(DEFAULT_PONG_DELAY,                10).
+-define(DEFAULT_PONG_DELAY,               100).
 -define(DEFAULT_GOSSIPED_NEIGHBOURS,       30).
 -define(DEFAULT_MAX_INBOUND,         infinity).
 -define(DEFAULT_MAX_OUTBOUND,        infinity).

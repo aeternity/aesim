@@ -25,10 +25,10 @@
 
 %=== MACROS ====================================================================
 
--define(DEFAULT_CONNECT_DELAY,          30).
--define(DEFAULT_ACCEPT_DELAY,           10).
--define(DEFAULT_REJECT_DELAY,           10).
--define(DEFAULT_DISCONNECT_DELAY,       10).
+-define(DEFAULT_CONNECT_DELAY,         100).
+-define(DEFAULT_ACCEPT_DELAY,           50).
+-define(DEFAULT_REJECT_DELAY,           50).
+-define(DEFAULT_DISCONNECT_DELAY,       50).
 -define(DEFAULT_REJECT_IPROB,     infinity).
 
 %=== BEHAVIOUR aesim_connection CALLBACK FUNCTIONS =============================

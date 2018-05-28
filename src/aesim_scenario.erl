@@ -13,42 +13,81 @@
        Sim :: sim().
 
 -callback scenario_new(Sim)
-  -> {State, Sim}
+  -> {State, Sim} | {State, PhaseSpecs, Sim}
   when State :: term(),
+       PhaseSpecs :: phase_specs(),
        Sim :: sim().
 
 -callback scenario_start(State, Nodes, Sim)
+  -> {State, Nodes, Sim} | {State, StartPhaseTag, Nodes, Sim}
+  when State :: term(),
+       StartPhaseTag :: phase_tag(),
+       Nodes :: aesim_nodes:state(),
+       Sim :: sim().
+
+-callback scenario_phase_start(State, Phase, Nodes, Sim)
   -> {State, Nodes, Sim}
   when State :: term(),
+       Phase :: phase(),
        Nodes :: aesim_nodes:state(),
        Sim :: sim().
 
+-callback scenario_phase_stop(State, Phase, Nodes, Sim)
+  -> {State, Nodes, Sim}
+  when State :: term(),
+       Phase :: phase(),
+       Nodes :: aesim_nodes:state(),
+       Sim :: sim().
+
+-callback scenario_phase_check(State, Phase, Nodes, Sim)
+  -> continue | {next, PhaseTag} | {stop, Reason}
+  when State :: term(),
+       Phase :: phase(),
+       PhaseTag :: phase_tag(),
+       Nodes :: aesim_nodes:state(),
+       Reason :: termination_reason(),
+       Sim :: sim().
+
+%% This is called for every iteration loop of the simulation;
+%% it shouldn't do any heavy calculation or simulation will get slow.
 -callback scenario_has_terminated(State, Nodes, Sim)
-  -> boolean()
+  -> continue | {stop, Reason}
   when State :: term(),
        Nodes :: aesim_nodes:state(),
+       Reason :: termination_reason(),
        Sim :: sim().
 
--callback scenario_progress(State, Nodes, Sim)
+-callback scenario_progress(State, Phase, Nodes, Sim)
   -> {State, Sim}
   when State :: term(),
+       Phase :: undefined | phase(),
        Nodes :: aesim_nodes:state(),
        Sim :: sim().
 
 -callback scenario_report(State, Reason, Nodes, Sim)
-  -> ok
+  -> Reason
   when State :: term(),
        Reason :: termination_reason(),
        Nodes :: aesim_nodes:state(),
        Sim :: sim().
 
--callback scenario_handle_event(State, EventName, Params, Nodes, Sim)
+-callback scenario_handle_event(State, Phase, EventName, Params, Nodes, Sim)
   -> ignore | {State, Sim}
   when State :: term(),
+       Phase :: undefined | phase(),
        EventName :: event_name(),
        Params :: term(),
        Nodes :: aesim_nodes:state(),
        Sim :: sim().
+
+-optional_callbacks([
+  scenario_phase_start/4,
+  scenario_phase_stop/4,
+  scenario_phase_check/4,
+  scenario_has_terminated/3,
+  scenario_progress/4,
+  scenario_report/4
+]).
 
 %=== EXPORTS ===================================================================
 
@@ -56,11 +95,40 @@
 -export([calculate_progress/1]).
 -export([nodes_status/2]).
 -export([default_start/2]).
--export([default_progress/2]).
+-export([default_progress_header/1]).
+-export([default_progress/3]).
 -export([default_report/3]).
 -export([print_event_status/1]).
 -export([print_node_status/2]).
 -export([print_oulier_info/2]).
+-export([print_phase_start/2]).
+-export([print_phase_stop/2]).
+
+%=== TYPES =====================================================================
+
+-type phase_tag() :: atom().
+-type phase_spec() :: {
+  Description :: string(),
+  Tag :: phase_tag(),
+  CheckInterval :: sim_time()
+}.
+-type phase_specs() :: [phase_spec()].
+
+-type phase() :: #{
+  tag := phase_tag(),
+  index := pos_integer(),
+  desc := string(),
+  check_interval := infinity | delay(),
+  sim_start_time := sim_time(),
+  sim_stop_time := undefined | sim_time()
+}.
+
+-export_type([
+  phase_tag/0,
+  phase_spec/0,
+  phase_specs/0,
+  phase/0
+]).
 
 %=== MACROS ====================================================================
 
@@ -146,11 +214,16 @@ default_start(Nodes, Sim) ->
   aesim_simulator:print_title("CONFIGURATION", Sim2),
   aesim_config:print_config(Sim2),
   aesim_simulator:print_title("SIMULATION", Sim2),
-  aesim_simulator:print_header(?PROGRESS_SPECS, Sim2),
   {Nodes2, Sim2}.
 
--spec default_progress(aesim_nodes:state(), sim()) -> ok.
-default_progress(Nodes, Sim) ->
+-spec default_progress_header(sim()) -> ok.
+default_progress_header(Sim) ->
+  aesim_simulator:print_header(?PROGRESS_SPECS, Sim).
+
+-spec default_progress(phase() | undefined, aesim_nodes:state(), sim()) -> ok.
+default_progress(_Phase, Nodes, Sim) ->
+  #{progress_counter := ProgressCounter} = Sim,
+  if ProgressCounter =:= 1 -> default_progress_header(Sim); true -> ok end,
   EventCount = aesim_events:size(Sim),
   #{progress := Progress,
     real_time := RealTime,
@@ -172,10 +245,12 @@ default_report(_Reason, Nodes, Sim) ->
   print_oulier_info(Nodes, Sim),
   aesim_metrics:print_report(Sim).
 
+-spec print_event_status(sim()) -> ok.
 print_event_status(Sim) ->
   aesim_simulator:print_title("EVENTS STATUS", Sim),
   aesim_events:print_summary(Sim).
 
+-spec print_node_status(aesim_nodes:state(), sim()) -> ok.
 print_node_status(Nodes, Sim) ->
   aesim_simulator:print_title("NODES STATUS", Sim),
   aesim_simulator:print_header(?STATUS_SPECS, Sim),
@@ -184,6 +259,7 @@ print_node_status(Nodes, Sim) ->
     aesim_simulator:print_fields(?STATUS_SPECS, Fields, Sim)
   end, nodes_status(Nodes, Sim)).
 
+-spec print_oulier_info(aesim_nodes:state(), sim()) -> ok.
 print_oulier_info(Nodes, Sim) ->
   aesim_simulator:print_title("OUTLIER INFORMATION", Sim),
   TrustedIds = [I || {I, _} <- aesim_nodes:trusted(Nodes)],
@@ -231,3 +307,19 @@ print_oulier_info(Nodes, Sim) ->
   aesim_simulator:print("Nodes with the LESS pooled verified peers:~n", [], Sim),
   PrintNodesFun(MinPVs, 4, 1, "peer(s)"),
   ok.
+
+-spec print_phase_start(phase(), sim()) -> ok.
+print_phase_start(Phase, Sim) ->
+  #{tag := Tag, index := Idx, desc := Desc} = Phase,
+  Title = aesim_utils:format("PHASE ~2b START : ~w", [Idx, Tag]),
+  aesim_simulator:print_comment(Title, Sim),
+  aesim_simulator:print_comment(Desc, Sim).
+
+-spec print_phase_stop(phase(), sim()) -> ok.
+print_phase_stop(Phase, Sim) ->
+  #{index := Idx, sim_start_time := StartTime, sim_stop_time := StopTime} = Phase,
+  Duration = aesim_utils:format_time(StopTime - StartTime),
+  Title = aesim_utils:format("PHASE ~2b DONE  : ~s", [Idx, Duration]),
+  aesim_simulator:print_comment(Title, Sim),
+  aesim_simulator:print_separator(Sim).
+  
