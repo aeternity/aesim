@@ -67,6 +67,7 @@
   [connections, pruned],
   [peers, expired],
   [gossip, received],
+  [pool, known],
   [pool, verified]
 ]).
 
