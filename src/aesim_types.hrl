@@ -1,3 +1,13 @@
+%=== MACROS ====================================================================
+
+-define(DEBUG_NODE_ID, 10).
+-define(DEBUG_NODE(FMT, ARGS, ID), (fun() ->
+  case (ID) =:= ?DEBUG_NODE_ID of
+    false -> ok;
+    true -> io:format((FMT), (ARGS))
+  end
+end())).
+
 %=== TYPES =====================================================================
 
 -type real_time() :: non_neg_integer().

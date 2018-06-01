@@ -27,10 +27,11 @@
        Context :: context(),
        Sim :: sim().
 
--callback node_accept(State, PeerId, Context, Sim)
+-callback node_accept(State, PeerId, ConnRef, Context, Sim)
   -> {accept, State, Sim} | {reject, Sim}
   when State :: term(),
        PeerId :: id(),
+       ConnRef :: conn_ref(),
        Context :: context(),
        Sim :: sim().
 
@@ -82,6 +83,7 @@
 %% Event handling functions; only used by aesim_nodes and aesim_connections
 -export([route_event/5]).
 -export([post_conn_initiated/6]).
+-export([async_conn_aborted/5]).
 -export([async_conn_established/5]).
 -export([async_conn_terminated/5]).
 -export([async_conn_failed/3]).
@@ -201,6 +203,11 @@ async_peer_expired(NodeId, PeerId, Sim) ->
 post_conn_initiated(Delay, NodeId, PeerId, ConnRef, Opts, Sim) ->
   post(Delay, NodeId, conn_initiated, {PeerId, ConnRef, Opts}, Sim).
 
+-spec async_conn_aborted(id(), id(), conn_ref(), conn_type(), sim()) -> sim().
+async_conn_aborted(NodeId, PeerId, ConnRef, ConnType, Sim) ->
+  {_, Sim2} = post(0, NodeId, conn_aborted, {PeerId, ConnRef, ConnType}, Sim),
+  Sim2.
+
 -spec async_conn_established(id(), id(), conn_ref(), conn_type(), sim()) -> sim().
 async_conn_established(NodeId, PeerId, ConnRef, ConnType, Sim) ->
   {_, Sim2} = post(0, NodeId, conn_established, {PeerId, ConnRef, ConnType}, Sim),
@@ -219,6 +226,8 @@ async_conn_failed(NodeId, PeerId, Sim) ->
 -spec route_event(state(), event_addr(), event_name(), term(), sim()) -> {state(), sim()}.
 route_event(State, [], conn_initiated, {PeerId, ConnRef, Opts}, Sim) ->
   on_connection_initiated(State, PeerId, ConnRef, Opts, Sim);
+route_event(State, [], conn_aborted, Params, Sim) ->
+  forward_event(State, conn_aborted, Params, Sim);
 route_event(State, [], conn_established, {PeerId, ConnRef, ConnType}, Sim) ->
   on_connection_established(State, PeerId, ConnRef, ConnType, Sim);
 route_event(State, [], conn_terminated, {PeerId, ConnRef, ConnType}, Sim) ->
@@ -308,7 +317,7 @@ on_connection_initiated(State, PeerId, ConnRef, Opts, Sim) ->
       Sim3 = metrics_inc(State2, [connections, rejected], Sim2),
       {State2, Sim3};
     {accept, State2, Data, Sim2} ->
-      case node_accept(State2, PeerId, Sim2) of
+      case node_accept(State2, PeerId, ConnRef, Sim2) of
         {reject, State3, Sim3} ->
           Sim4 = metrics_inc(State3, [connections, rejected], Sim3),
           conns_commit_reject(State3, Data, Sim4);
@@ -482,11 +491,11 @@ node_start(State, Trusted, Sim) ->
   {Sub2, Sim2} = NodeMod:node_start(Sub, Trusted, Context, Sim),
   {State#{sub := Sub2}, Sim2}.
 
-node_accept(State, PeerId, Sim) ->
+node_accept(State, PeerId, ConnRef, Sim) ->
   #{sub := Sub} = State,
   Context = node_context(State),
   NodeMod = cfg_node_mod(Sim),
-  {Res, Sub2, Sim2} = NodeMod:node_accept(Sub, PeerId, Context, Sim),
+  {Res, Sub2, Sim2} = NodeMod:node_accept(Sub, PeerId, ConnRef, Context, Sim),
   {Res, State#{sub := Sub2}, Sim2}.
 
 node_handle_event(State, Name, Params, Sim) ->

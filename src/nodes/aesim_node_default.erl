@@ -24,7 +24,7 @@
 -export([parse_options/2]).
 -export([node_new/3]).
 -export([node_start/4]).
--export([node_accept/4]).
+-export([node_accept/5]).
 -export([node_handle_event/5]).
 -export([node_handle_message/6]).
 -export([report/4]).
@@ -33,6 +33,7 @@
 
 -type state() :: #{
   connecting := boolean(),
+  temporary := #{conn_ref() => true},
   outbound := non_neg_integer(),
   inbound := non_neg_integer()
 }.
@@ -44,6 +45,7 @@
 -define(DEFAULT_PONG_DELAY,               100).
 -define(DEFAULT_GOSSIPED_NEIGHBOURS,       30).
 -define(DEFAULT_MAX_INBOUND,         infinity).
+-define(DEFAULT_SOFT_MAX_INBOUND,    infinity).
 -define(DEFAULT_MAX_OUTBOUND,        infinity).
 -define(DEFAULT_CONNECT_PERIOD,             0).
 
@@ -56,13 +58,14 @@ parse_options(Opts, Sim) ->
     {pong_delay, time, ?DEFAULT_PONG_DELAY},
     {gossiped_neighbours, integer, ?DEFAULT_GOSSIPED_NEIGHBOURS},
     {max_inbound, integer_infinity, ?DEFAULT_MAX_INBOUND},
+    {soft_max_inbound, integer_infinity, ?DEFAULT_SOFT_MAX_INBOUND},
     {max_outbound, integer_infinity, ?DEFAULT_MAX_OUTBOUND},
     {connect_period, integer_infinity, ?DEFAULT_CONNECT_PERIOD}
   ]).
 
 -spec node_new(address_map(), context(), sim()) -> {state(), address(), sim()}.
 node_new(AddrMap, _Context, Sim) ->
-  State = #{inbound => 0, outbound => 0, connecting => false},
+  State = #{temporary => #{}, inbound => 0, outbound => 0, connecting => false},
   {State, rand_address(AddrMap), Sim}.
 
 %% Connects to all trusted peers and starts periodical connection to pooled peers.
@@ -75,14 +78,16 @@ node_start(State, Trusted, Context, Sim) ->
   start_pool_connecting(State2, Context, Sim2).
 
 %% Accepts all connections up to the configured maximum number of inbound connections.
-node_accept(State, PeerId, Context, Sim) ->
-  case maybe_accept(State, PeerId, Context, Sim) of
+node_accept(State, PeerId, ConnRef, Context, Sim) ->
+  case maybe_accept(State, PeerId, ConnRef, Context, Sim) of
     {true, State2, Sim2} -> {accept, State2, Sim2};
     {false, State2, Sim2} -> {reject, State2, Sim2}
   end.
 
 node_handle_event(State, conn_failed, PeerId, Context, Sim) ->
   on_connection_failed(State, PeerId, Context, Sim);
+node_handle_event(State, conn_aborted, {PeerId, ConnRef, ConnType}, Context, Sim) ->
+  on_connection_aborted(State, PeerId, ConnRef, ConnType, Context, Sim);
 node_handle_event(State, conn_established, {PeerId, ConnRef, ConnType}, Context, Sim) ->
   on_connection_established(State, PeerId, ConnRef, ConnType, Context, Sim);
 node_handle_event(State, conn_terminated, {PeerId, ConnRef, ConnType}, Context, Sim) ->
@@ -200,11 +205,13 @@ maybe_connect(State, PeerId, Context, Sim) ->
   end.
 
 %% Accept a peer connection if the maximum number of inbound connections is not reached.
-maybe_accept(State, _PeerId, _Context, Sim) ->
+maybe_accept(State, _PeerId, ConnRef, _Context, Sim) ->
   #{inbound := CurrInbound} = State,
+  SoftMax = cfg_soft_max_inbound(Sim),
+  IsSoft = (SoftMax =/= infinity) andalso (CurrInbound >= SoftMax),
   case {cfg_max_inbound(Sim), CurrInbound} of
     {Max, Curr} when Max =:= infinity; Curr < Max ->
-      {State2, Sim2} = accept(State, Sim),
+      {State2, Sim2} = accept(State, ConnRef, IsSoft, Sim),
       {true, State2, Sim2};
     {_Max, _Curr} ->
       {false, State, Sim}
@@ -215,7 +222,10 @@ connect(State, NodeId, PeerId, Sim) ->
   Sim2 = aesim_node:async_connect(NodeId, PeerId, Sim),
   {State#{outbound := Outbound + 1}, Sim2}.
 
-accept(State, Sim) ->
+accept(State, ConnRef, true, Sim) ->
+  #{inbound := Inbound, temporary := Temp} = State,
+  {State#{inbound := Inbound + 1, temporary := Temp#{ConnRef => true}}, Sim};
+accept(State, _ConnRef, false, Sim) ->
   #{inbound := Inbound} = State,
   {State#{inbound := Inbound + 1}, Sim}.
 
@@ -275,9 +285,17 @@ do_ping(State, ConnRef, Context, Sim) ->
 
 %% Prepares and sends a ping reponse message through a connection.
 do_pong(State, ConnRef, Exclude, Context, Sim) ->
-  #{node_addr := NodeAddr} = Context,
+  #{temporary := Temp} = State,
+  #{node_id := NodeId, node_addr := NodeAddr} = Context,
   {Neighbours, Sim2} = get_neighbours(Exclude, Context, Sim),
-  {State, send_pong(ConnRef, NodeAddr, Neighbours, Context, Sim2)}.
+  Sim3 = send_pong(ConnRef, NodeAddr, Neighbours, Context, Sim2),
+  % if the connection is temporary, we disconnect.
+  case maps:take(ConnRef, Temp) of
+    error -> {State, Sim3};
+    {true, Temp2} ->
+      Sim4 = aesim_node:async_disconnect(NodeId, ConnRef, Sim3),
+      {State#{temporary := Temp2}, Sim4}
+  end.
 
 on_peer_identified(State, PeerId, Context, Sim) ->
   #{conns := Conns} = Context,
@@ -292,10 +310,13 @@ on_connection_failed(State, _PeerId, Context, Sim) ->
   {State2, Sim2} = closed(State, outbound, Sim),
   start_pool_connecting(State2, Context, Sim2).
 
+on_connection_aborted(State, _PeerId, _ConnRef, ConnType, _Context, Sim) ->
+  closed(State, ConnType, Sim).
+
 %% Prunes the connections, and send a ping message if it is an outbound connection.
 %% The connection may be aborted if the connection itself got pruned away.
-on_connection_established(State, PeerId, ConnRef, Type, Context, Sim) ->
-  case {Type, prune_connections(State, PeerId, ConnRef, Context, Sim)} of
+on_connection_established(State, PeerId, ConnRef, ConnType, Context, Sim) ->
+  case {ConnType, prune_connections(State, PeerId, ConnRef, Context, Sim)} of
     {_, {abort, State2, Sim2}} -> {State2, Sim2};
     {inbound, {continue, State2, Sim2}} -> {State2, Sim2};
     {outbound, {continue, State2, Sim2}} ->
@@ -349,6 +370,8 @@ cfg_pong_delay(Sim) -> aesim_config:get(Sim, pong_delay).
 cfg_gossiped_neighbours(Sim) -> aesim_config:get(Sim, gossiped_neighbours).
 
 cfg_max_inbound(Sim) -> aesim_config:get(Sim, max_inbound).
+
+cfg_soft_max_inbound(Sim) -> aesim_config:get(Sim, soft_max_inbound).
 
 cfg_max_outbound(Sim) -> aesim_config:get(Sim, max_outbound).
 

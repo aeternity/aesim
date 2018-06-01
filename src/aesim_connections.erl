@@ -150,9 +150,10 @@ disconnect(State, ConnRef, Context, Sim) ->
       {_, Sim4} = post_closed(Delay, PeerId, ConnRef, Sim3),
       Sim5 = aesim_node:async_conn_terminated(NodeId, PeerId, ConnRef, ConnType, Sim4),
       {del_connection(State, ConnRef), Sim5};
-    {ok, #{status := connecting, peer := PeerId}} ->
-      Sim2 = async_aborted(PeerId, ConnRef, Sim),
-      {del_connection(State, ConnRef), Sim2}
+    {ok, #{status := connecting, type := ConnType, peer := PeerId}} ->
+      Sim2 = aesim_node:async_conn_aborted(NodeId, PeerId, ConnRef, ConnType, Sim),
+      Sim3 = async_aborted(NodeId, ConnRef, Sim2),
+      {del_connection(State, ConnRef), Sim3}
   end.
 
 -spec disconnect_peer(state(), id(), context(), sim()) -> {state(), sim()}.
