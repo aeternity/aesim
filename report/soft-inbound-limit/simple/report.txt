@@ -1,0 +1,129 @@
+### CONFIGURATION ##############################################################
+accept_delay        :                             50 integer           (default)
+bootstrap_size      :                              3 integer           (default)
+conn_mod            :       aesim_connection_default atom              (default)
+connect_delay       :                            100 integer           (default)
+connect_period      :                              0 integer_infinity  (default)
+disconnect_delay    :                             50 integer           (default)
+first_ping_delay    :                            100 time              (default)
+gossiped_neighbours :                             30 integer           (default)
+max_inbound         :                       infinity integer_infinity  (default)
+max_nodes           :                            300 integer                    
+max_outbound        :                             10 integer_infinity           
+max_real_time       :                       infinity time_infinity     (default)
+max_sim_time        :                             3h time_infinity              
+node_mod            :             aesim_node_default atom              (default)
+node_start_period   :                            30s time              (default)
+ping_period         :                             2m time              (default)
+pong_delay          :                            100 time              (default)
+pool_mod            :              aesim_pool_simple atom              (default)
+progress_interval   :                             1s time              (default)
+reject_delay        :                             50 integer           (default)
+reject_iprob        :                       infinity integer_infinity  (default)
+rrd_enabled         :                           true boolean                    
+scenario_mod        :         aesim_scenario_default atom              (default)
+soft_max_inbound    :                            100 integer_infinity           
+trusted_count       :                              2 integer           (default)
+### SIMULATION #################################################################
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     21%   0h00m01s000   0h39m30s350      2370x      2370x    82     801     803
+     29%   0h00m02s000   0h53m00s650       810x      1590x   109    1084    1093
+     34%   0h00m03s000   1h02m32s900       572x      1251x   128    1280    1289
+     39%   0h00m04s000   1h10m33s000       480x      1058x   144    1440    1449
+     43%   0h00m05s000   1h17m32s850       420x       931x   158    1580    1590
+     46%   0h00m06s000   1h23m33s800       361x       836x   170    1700    1710
+     49%   0h00m07s000   1h29m04s500       331x       764x   181    1810    1819
+     52%   0h00m08s000   1h34m02s100       298x       705x   191    1910    1920
+     54%   0h00m09s000   1h38m34s000       272x       657x   200    2000    2009
+     56%   0h00m10s000   1h42m35s100       241x       616x   208    2080    2089
+     59%   0h00m11s000   1h47m01s000       266x       584x   217    2170    2179
+     61%   0h00m12s000   1h50m34s500       214x       553x   224    2240    2249
+     63%   0h00m13s000   1h54m31s700       237x       529x   232    2320    2329
+     65%   0h00m14s000   1h58m01s600       210x       506x   239    2390    2399
+     67%   0h00m15s000   2h01m05s800       184x       484x   245    2450    2459
+     69%   0h00m16s000   2h04m33s550       208x       467x   252    2520    2530
+     70%   0h00m17s000   2h07m33s800       180x       450x   258    2580    2589
+     72%   0h00m18s000   2h10m35s000       181x       435x   264    2640    2649
+     74%   0h00m19s000   2h13m33s300       178x       422x   270    2700    2709
+     75%   0h00m20s000   2h16m30s250       177x       410x   276    2752    2761
+     77%   0h00m21s000   2h19m02s550       152x       397x   281    2810    2819
+     78%   0h00m22s000   2h21m34s900       152x       386x   286    2860    2869
+     80%   0h00m23s000   2h24m05s500       151x       376x   291    2910    2920
+     81%   0h00m24s000   2h26m34s600       149x       366x   296    2960    2969
+     82%   0h00m25s000   2h29m03s800       149x       358x   300    3000    3008
+     84%   0h00m26s000   2h31m31s700       148x       350x   300    3000    3000
+     85%   0h00m27s000   2h34m02s400       151x       342x   300    3000    3000
+     86%   0h00m28s000   2h36m33s200       151x       335x   300    3000    3000
+     88%   0h00m29s000   2h39m03s900       151x       329x   300    3000    3001
+     89%   0h00m30s000   2h41m34s800       151x       323x   300    3000    3000
+     91%   0h00m31s000   2h44m06s200       151x       318x   300    3000    3000
+     92%   0h00m32s000   2h46m37s600       151x       312x   300    3000    3000
+     93%   0h00m33s000   2h49m08s200       151x       308x   300    3000    3000
+     95%   0h00m34s000   2h52m01s800       174x       304x   300    3000    3001
+     96%   0h00m35s000   2h54m34s400       153x       299x   300    3000    3000
+     98%   0h00m36s000   2h57m06s500       152x       295x   300    3000    3000
+     99%   0h00m37s000   2h59m37s500       151x       291x   300    3000    3000
+### EVENTS STATUS ##############################################################
+conn_send     :      1 event(s) for    1 target(s)
+do_ping       :   2999 event(s) for  300 target(s)
+### NODES STATUS ###############################################################
+DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
+Inbound connections                                    0      10       7     100
+Outbound connections                                  10      10      10      10
+Known peers                                          299     299     299     299
+Known peers (%)                                      100     100     100     100
+Pooled verified peers                                299     299     299     299
+Pooled verified peers (%)                            100     100     100     100
+### OUTLIER INFORMATION ########################################################
+Nodes with the MOST outbound connections:
+  Node  234:    10 connection(s)
+  Node  261:    10 connection(s)
+  Node   12:    10 connection(s)
+  Node  278:    10 connection(s)
+Nodes with the LESS outbound connections:
+  Node  234:    10 connection(s)
+  Node  261:    10 connection(s)
+  Node   12:    10 connection(s)
+  Node  278:    10 connection(s)
+Nodes with the MOST inbound connections:
+  Node    2:   100 connection(s) (trusted)
+  Node    3:   100 connection(s) (trusted)
+  Node    1:    47 connection(s)
+  Node   12:    41 connection(s)
+Nodes with the LESS inbound connections:
+  Node  261:     0 connection(s)
+  Node  278:     0 connection(s)
+  Node  295:     0 connection(s)
+  Node  257:     0 connection(s)
+Nodes with the MOST pooled verified peers:
+  Node  234:   299 peer(s)
+  Node  261:   299 peer(s)
+  Node   12:   299 peer(s)
+  Node  278:   299 peer(s)
+Nodes with the LESS pooled verified peers:
+  Node  234:   299 peer(s)
+  Node  261:   299 peer(s)
+  Node   12:   299 peer(s)
+  Node  278:   299 peer(s)
+### NODES METRICS ##############################################################
+DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
+connections.accepted                                   1      13       8     309
+connections.connect                                   10      11      12      14
+connections.count.inbound                              1      11       8     100
+connections.count.outbound                            10      10      10      10
+connections.disconnect                                 1      83       1     209
+connections.established.inbound                        1      13       8     309
+connections.established.outbound                      10      11      12      14
+connections.pruned                                     1       1       1       1
+connections.terminated.inbound                         1      83       1     209
+connections.terminated.outbound                        1       2       2       4
+gossip.received                                      162    1068     794    8675
+pool.known                                           299     299     299     299
+pool.verified                                        299     299     299     299
+### METRICS GRAPHS #############################################################
+DATABASE: /home/sylane/Workspace/aeternity/aesim/simulations/20180601185724552/metrics/metrics.rrd
+RRDTOOL PARAMETERS: --start 1527804000 --end 1527814800
+INDEX: file:///home/sylane/Workspace/aeternity/aesim/simulations/20180601185724552/metrics/metrics.html
+################################################################################
+### SIMULATION DONE : normal ###################################################
+################################################################################
