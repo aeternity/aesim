@@ -30,12 +30,13 @@
   when State :: term(),
        CounterName :: pool_counters().
 
--callback pool_select(State, Exclude, Context, Sim)
+-callback pool_select(State, ExcludePeerIds, ExcludePeerGroups, Context, Sim)
   -> {selected, PeerId, Sim}
    | {retry, NextTryTime, Sim}
    | {unavailable, Sim}
   when State :: term(),
-       Exclude :: [id()],
+       ExcludePeerIds :: [id()],
+       ExcludePeerGroups :: [address_group()],
        Context :: context(),
        Sim :: sim(),
        PeerId :: id(),
@@ -68,7 +69,7 @@
 %=== EXPORTS ===================================================================
 
 -export([count/2]).
--export([select/4]).
+-export([select/5]).
 -export([gossip/5]).
 
 %=== TYPES =====================================================================
@@ -81,10 +82,10 @@
 count({Mod, State}, CounterName) ->
   Mod:pool_count(State, CounterName).
 
--spec select(pool(), [id()], context(), sim())
+-spec select(pool(), [id()], [address_group()], context(), sim())
   -> {selected, id(), sim()} | {retry, sim_time(), sim()} | {unavailable, sim()}.
-select({Mod, State}, Exclude, Context, Sim) ->
-  Mod:pool_select(State, Exclude, Context, Sim).
+select({Mod, State}, ExcludePeerIds, ExcludePeerGroups, Context, Sim) ->
+  Mod:pool_select(State, ExcludePeerIds, ExcludePeerGroups, Context, Sim).
 
 -spec gossip(pool(), pos_integer(), [id()], context(), sim()) -> {[id()], sim()}.
 gossip({Mod, State}, Count, Exclude, Context, Sim) ->

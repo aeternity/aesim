@@ -14,6 +14,7 @@ end())).
 -type sim_time() :: non_neg_integer().
 -type delay() :: non_neg_integer().
 -type id() :: pos_integer().
+-type address_group() :: {0..255, 0..255}.
 -type address() :: {inet:ip_address(), inet:port_number()}.
 -type address_map() :: #{address() => id()}.
 -type termination_reason() :: error | frozen | sim_timeout | real_timeout | normal.

@@ -86,7 +86,7 @@
 -export([async_conn_aborted/5]).
 -export([async_conn_established/5]).
 -export([async_conn_terminated/5]).
--export([async_conn_failed/3]).
+-export([async_conn_failed/4]).
 
 %=== MACROS ====================================================================
 
@@ -142,12 +142,11 @@ start(State, Trusted, Sim) ->
   {State4, Sim4}.
 
 -spec connect(state(), id() | [id()], sim()) -> {state(), sim()}.
-connect(State, PeerIds, Sim) ->
-  % First be sure the peer exists
-  {State2, Sim2} = peer_ensure(State, PeerIds, Sim),
-  Sim3 = metrics_connection_retry(State2, PeerIds, Sim2),
-  {State3, Sim4} = conns_connect(State2, PeerIds, Sim3),
-  {State3, Sim4}.
+connect(State, PeerIds, Sim) when is_list(PeerIds) ->
+  Params = [{I, make_ref()} || I <- PeerIds],
+  do_connect(State, Params, Sim);
+connect(State, PeerId, Sim) ->
+  do_connect(State, [{PeerId, make_ref()}], Sim).
 
 -spec disconnect(state(), conn_ref() | [conn_ref()], sim()) -> {state(), sim()}.
 disconnect(State, ConnRefs, Sim) ->
@@ -172,10 +171,18 @@ report(State, Type, Sim) ->
 
 %--- API FUNCTIONS FOR CALLBACK MODULES ----------------------------------------
 
--spec async_connect(id(), id() | [id()], sim()) -> sim().
-async_connect(NodeId, PeerIds, Sim) ->
-  {_, Sim2} = post(0, NodeId, do_connect, PeerIds, Sim),
-  Sim2.
+-spec async_connect(id(), id() | [id()], sim()) -> {conn_ref() | [conn_ref()], sim()}.
+async_connect(NodeId, PeerIds, Sim) when is_list(PeerIds) ->
+  {Result, Params} = lists:foldl(fun(Id, {Res, Par}) ->
+    ConnRef = make_ref(),
+    {[ConnRef | Res], [{Id, ConnRef} | Par]}
+  end, {[], []}, PeerIds),
+  {_, Sim2} = post(0, NodeId, do_connect, Params, Sim),
+  {Result, Sim2};
+async_connect(NodeId, PeerId, Sim) ->
+  ConnRef = make_ref(),
+  {_, Sim2} = post(0, NodeId, do_connect, [{PeerId, ConnRef}], Sim),
+  {ConnRef, Sim2}.
 
 -spec async_disconnect(id(), conn_ref() | [conn_ref()], sim()) -> sim().
 async_disconnect(NodeId, ConnRefs, Sim) ->
@@ -218,9 +225,9 @@ async_conn_terminated(NodeId, PeerId, ConnRef, ConnType, Sim) ->
   {_, Sim2} = post(0, NodeId, conn_terminated, {PeerId, ConnRef, ConnType}, Sim),
   Sim2.
 
--spec async_conn_failed(id(), id(), sim()) -> sim().
-async_conn_failed(NodeId, PeerId, Sim) ->
-  {_, Sim2} = post(0, NodeId, conn_failed, PeerId, Sim),
+-spec async_conn_failed(id(), id(), conn_ref(), sim()) -> sim().
+async_conn_failed(NodeId, PeerId, ConnRef, Sim) ->
+  {_, Sim2} = post(0, NodeId, conn_failed, {PeerId, ConnRef}, Sim),
   Sim2.
 
 -spec route_event(state(), event_addr(), event_name(), term(), sim()) -> {state(), sim()}.
@@ -232,16 +239,16 @@ route_event(State, [], conn_established, {PeerId, ConnRef, ConnType}, Sim) ->
   on_connection_established(State, PeerId, ConnRef, ConnType, Sim);
 route_event(State, [], conn_terminated, {PeerId, ConnRef, ConnType}, Sim) ->
   on_connection_terminated(State, PeerId, ConnRef, ConnType, Sim);
-route_event(State, [], conn_failed, PeerId, Sim) ->
-  on_connection_failed(State, PeerId, Sim);
+route_event(State, [], conn_failed, {PeerId, ConnRef}, Sim) ->
+  on_connection_failed(State, PeerId, ConnRef, Sim);
 route_event(State, [], conn_send, {ConnRef, Msg}, Sim) ->
   on_connection_send(State, ConnRef, Msg, Sim);
 route_event(State, [], conn_receive, {ConnRef, Msg}, Sim) ->
   on_connection_receive(State, ConnRef, Msg, Sim);
 route_event(State, [], peer_expired, PeerId, Sim) ->
   on_peer_expired(State, PeerId, Sim);
-route_event(State, [], do_connect, PeerIds, Sim) ->
-  connect(State, PeerIds, Sim);
+route_event(State, [], do_connect, Params, Sim) ->
+  do_connect(State, Params, Sim);
 route_event(State, [], do_disconnect, ConnRefs, Sim) ->
   disconnect(State, ConnRefs, Sim);
 route_event(State, [], do_disconnect_peer, PeerIds, Sim) ->
@@ -267,6 +274,15 @@ send(NodeId, ConnRef, Message, Sim) ->
   Sim2.
 
 %=== INTERNAL FUNCTIONS ========================================================
+
+do_connect(State, Params, Sim) ->
+  PeerIds = [I || {I, _} <- Params],
+  % First be sure the peer exists
+  {State2, Sim2} = peer_ensure(State, PeerIds, Sim),
+  Sim3 = metrics_connection_retry(State2, PeerIds, Sim2),
+  {State3, Sim4} = conns_connect(State2, Params, Sim3),
+  {State3, Sim4}.
+
 
 do_gossip(State, Source, Neighbours, Sim) ->
   Sim2 = metrics_inc(State, [gossip, received], Sim),
@@ -341,11 +357,11 @@ on_connection_terminated(State, PeerId, ConnRef, ConnType, Sim) ->
   Sim3 = metrics_dec(State, [connections, count, ConnType], Sim2),
   forward_event(State, conn_terminated, {PeerId, ConnRef, ConnType}, Sim3).
 
-on_connection_failed(State, PeerId, Sim) ->
+on_connection_failed(State, PeerId, ConnRef, Sim) ->
   #{time := Time} = Sim,
   Sim2 = metrics_inc(State, [connections, failed], Sim),
   State2 = peer_connection_failed(State, PeerId, Time),
-  forward_event(State2, conn_failed, PeerId, Sim2).
+  forward_event(State2, conn_failed, {PeerId, ConnRef}, Sim2).
 
 on_connection_send(State, ConnRef, Msg, Sim) ->
   #{conns := Conns} = State,
@@ -424,20 +440,30 @@ peer_gossiped(State, _SourceId, SourceAddr, PeerId, PeerAddr, Sim) ->
       Peer = peer_new(default, PeerAddr, SourceAddr, Time),
       State2 = State#{peers := Peers#{PeerId => Peer}},
       forward_event(State2, peer_identified, PeerId, Sim);
-    {ok, Peer} ->
-      #{addr := OldAddr} = Peer,
+    {ok, #{addr := undefined} = Peer} ->
+      % We didn't know the peer address, so we update it, update gossip time
+      % and source and notify about the identifier peer.
       Peer2 = Peer#{
         addr := PeerAddr,
         source_addr := SourceAddr,
         gossip_time := Time
       },
       State2 = State#{peers := Peers#{PeerId := Peer2}},
-      %%TODO: No support for nodes that change there address yet...
-      case OldAddr of
-        PeerAddr -> {State2, Sim};
-        undefined ->
-          forward_event(State2, peer_identified, PeerId, Sim)
-      end
+      forward_event(State2, peer_identified, PeerId, Sim);
+    {ok, #{addr := PeerAddr} = Peer} ->
+      % The address did not change, so we only update gossip time and source
+      Peer2 = Peer#{
+        source_addr := SourceAddr,
+        gossip_time := Time
+      },
+      State2 = State#{peers := Peers#{PeerId := Peer2}},
+      {State2, Sim};
+    {ok, _Peer} ->
+      % The address changed, but we MUST NOT update it because it may be an
+      % attack vector to invalidate good peers. If the address really changed
+      % the peer will be removed through normal retry policy.
+      % We don't update source and gossip time either to favor eviction policy.
+      {State, Sim}
   end.
 
 peer_connected(State, PeerId, Time) ->
@@ -556,14 +582,14 @@ conns_new(State, Sim) ->
   {Conns, Sim2} = aesim_connections:new(Context, Sim),
   {State#{conns => Conns}, Sim2}.
 
-conns_connect(State, undefined, Sim) -> {State, Sim};
-conns_connect(State, PeerIds, Sim) when is_list(PeerIds) ->
-  lists:foldl(fun(P, {St, Sm}) -> conns_connect(St, P, Sm) end,
-              {State, Sim}, PeerIds);
-conns_connect(State, PeerId, Sim) ->
+conns_connect(State, Params, Sim) when is_list(Params) ->
+  lists:foldl(fun({P, R}, {St, Sm}) -> conns_connect(St, P, R, Sm) end,
+              {State, Sim}, Params).
+
+conns_connect(State, PeerId, ConnRef, Sim) ->
   #{conns := Conns} = State,
   Context = conns_context(State),
-  {Conns2, Sim2} = aesim_connections:connect(Conns, PeerId, Context, Sim),
+  {Conns2, Sim2} = aesim_connections:connect(Conns, PeerId, ConnRef, Context, Sim),
   {State#{conns => Conns2}, Sim2}.
 
 conns_disconnect(State, undefined, Sim) -> {State, Sim};

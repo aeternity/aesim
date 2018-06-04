@@ -22,7 +22,7 @@
 %% Internal API functions only used by aesim_node
 -export([parse_options/2]).
 -export([new/2]).
--export([connect/4]).
+-export([connect/5]).
 -export([disconnect/4]).
 -export([disconnect_peer/4]).
 -export([prepare_accept/6]).
@@ -129,11 +129,10 @@ peer_connections(State, PeerId) ->
 has_connection(State, PeerId) ->
   index_has_key(PeerId, index_peers_get(State, PeerId)).
 
--spec connect(state(), id(), context(), sim()) -> {state(), sim()}.
-connect(State, PeerId, Context, Sim) ->
+-spec connect(state(), id(), conn_ref(), context(), sim()) -> {state(), sim()}.
+connect(State, PeerId, ConnRef, Context, Sim) ->
   #{node_id := NodeId} = Context,
   Sim2 = metrics_inc([connections, connect], Context, Sim),
-  ConnRef = make_ref(),
   {Conn, Sim3} = conn_new(ConnRef, PeerId, outbound, connecting, Context, Sim2),
   {Conn2, Delay, Opts, Sim4} = conn_connect(Conn, Context, Sim3),
   {_, Sim5} = aesim_node:post_conn_initiated(Delay, PeerId, NodeId, ConnRef, Opts, Sim4),
@@ -310,7 +309,7 @@ on_rejected(State, ConnRef, Context, Sim) ->
   case get_connection(State, ConnRef) of
     error -> {State, Sim};
     {ok, #{peer := PeerId, type := outbound}} ->
-      Sim2 = aesim_node:async_conn_failed(NodeId, PeerId, Sim),
+      Sim2 = aesim_node:async_conn_failed(NodeId, PeerId, ConnRef, Sim),
       {del_connection(State, ConnRef), Sim2}
   end.
 

@@ -9,7 +9,9 @@
 %%  - Handle gossip ping responses.
 %%  - Optionally limites the number of inbound/outbound connections.
 %%  - If the outbound connections are limited, when one fail or is closed
-%%   a random peer (not yet connected) is taken from the pool and connected to.
+%%  a random peer (not yet connected) is taken from the pool and connected to.
+%%  - Optionally limit the outbound connections to one connection per address
+%%  group.
 
 -behaviour(aesim_node).
 
@@ -34,20 +36,21 @@
 -type state() :: #{
   connecting := boolean(),
   temporary := #{conn_ref() => true},
-  outbound := non_neg_integer(),
+  outbound := #{conn_ref() => address_group()},
   inbound := non_neg_integer()
 }.
 
 %=== MACROS ====================================================================
 
--define(DEFAULT_FIRST_PING_DELAY,         100).
--define(DEFAULT_PING_PERIOD,             "2m").
--define(DEFAULT_PONG_DELAY,               100).
--define(DEFAULT_GOSSIPED_NEIGHBOURS,       30).
--define(DEFAULT_MAX_INBOUND,         infinity).
--define(DEFAULT_SOFT_MAX_INBOUND,    infinity).
--define(DEFAULT_MAX_OUTBOUND,        infinity).
--define(DEFAULT_CONNECT_PERIOD,             0).
+-define(DEFAULT_FIRST_PING_DELAY,           100).
+-define(DEFAULT_PING_PERIOD,               "2m").
+-define(DEFAULT_PONG_DELAY,                 100).
+-define(DEFAULT_GOSSIPED_NEIGHBOURS,         30).
+-define(DEFAULT_MAX_INBOUND,           infinity).
+-define(DEFAULT_SOFT_MAX_INBOUND,      infinity).
+-define(DEFAULT_MAX_OUTBOUND,          infinity).
+-define(DEFAULT_CONNECT_PERIOD,               0).
+-define(DEFAULT_LIMIT_OUTBOUND_GROUPS,    false).
 
 %=== BEHAVIOUR aesim_node CALLBACK FUNCTIONS ===================================
 
@@ -60,12 +63,18 @@ parse_options(Opts, Sim) ->
     {max_inbound, integer_infinity, ?DEFAULT_MAX_INBOUND},
     {soft_max_inbound, integer_infinity, ?DEFAULT_SOFT_MAX_INBOUND},
     {max_outbound, integer_infinity, ?DEFAULT_MAX_OUTBOUND},
-    {connect_period, integer_infinity, ?DEFAULT_CONNECT_PERIOD}
+    {connect_period, integer_infinity, ?DEFAULT_CONNECT_PERIOD},
+    {limit_outbound_groups, boolean, ?DEFAULT_LIMIT_OUTBOUND_GROUPS}
   ]).
 
 -spec node_new(address_map(), context(), sim()) -> {state(), address(), sim()}.
 node_new(AddrMap, _Context, Sim) ->
-  State = #{temporary => #{}, inbound => 0, outbound => 0, connecting => false},
+  State = #{
+    temporary => #{},
+    inbound => 0,
+    outbound => #{},
+    connecting => false
+  },
   {State, rand_address(AddrMap), Sim}.
 
 %% Connects to all trusted peers and starts periodical connection to pooled peers.
@@ -84,8 +93,8 @@ node_accept(State, PeerId, ConnRef, Context, Sim) ->
     {false, State2, Sim2} -> {reject, State2, Sim2}
   end.
 
-node_handle_event(State, conn_failed, PeerId, Context, Sim) ->
-  on_connection_failed(State, PeerId, Context, Sim);
+node_handle_event(State, conn_failed, {PeerId, ConnRef}, Context, Sim) ->
+  on_connection_failed(State, PeerId, ConnRef, Context, Sim);
 node_handle_event(State, conn_aborted, {PeerId, ConnRef, ConnType}, Context, Sim) ->
   on_connection_aborted(State, PeerId, ConnRef, ConnType, Context, Sim);
 node_handle_event(State, conn_established, {PeerId, ConnRef, ConnType}, Context, Sim) ->
@@ -180,10 +189,15 @@ start_pool_connecting(#{connecting := false} = State, Context, Sim) ->
 %% The pool can respond with the next time a peer will be available due
 %% to the retry policy; it is used it to schedule the next try.
 maybe_pool_connect(State, Context, Sim) ->
+  #{outbound := Outbound} = State,
   #{time := Now} = Sim,
   #{pool := Pool, conns := Conns} = Context,
   ConnectedPeers = aesim_connections:peers(Conns, all),
-  case aesim_pool:select(Pool, ConnectedPeers, Context, Sim) of
+  ExcludeGroups = case cfg_limit_outbound_groups(Sim) of
+    false -> [];
+    true -> maps:values(Outbound)
+  end,
+  case aesim_pool:select(Pool, ConnectedPeers, ExcludeGroups, Context, Sim) of
     {unavailable, Sim2} ->
       {false, State, Sim2};
     {retry, NextTry, Sim2} ->
@@ -194,11 +208,10 @@ maybe_pool_connect(State, Context, Sim) ->
 
 %% Connects to a peer if the maximum number of outbound connections is not reached.
 maybe_connect(State, PeerId, Context, Sim) ->
-  #{node_id := NodeId} = Context,
   #{outbound := CurrOutbound} = State,
-  case {cfg_max_outbound(Sim), CurrOutbound} of
+  case {cfg_max_outbound(Sim), maps:size(CurrOutbound)} of
       {Max, Curr} when Max =:= infinity; Curr < Max ->
-        {State2, Sim2} = connect(State, NodeId, PeerId, Sim),
+        {State2, Sim2} = connect(State, PeerId, Context, Sim),
         {true, State2, Sim2};
       {_Max, _Curr} ->
         {false, State, Sim}
@@ -217,10 +230,16 @@ maybe_accept(State, _PeerId, ConnRef, _Context, Sim) ->
       {false, State, Sim}
   end.
 
-connect(State, NodeId, PeerId, Sim) ->
+connect(State, PeerId, Context, Sim) ->
   #{outbound := Outbound} = State,
-  Sim2 = aesim_node:async_connect(NodeId, PeerId, Sim),
-  {State#{outbound := Outbound + 1}, Sim2}.
+  #{node_id := NodeId, peers := Peers} = Context,
+  ?assert(maps:is_key(PeerId, Peers)),
+  #{PeerId := Peer} = Peers,
+  ?assertNotEqual(undefined, maps:get(addr, Peer)),
+  #{addr := PeerAddr} = Peer,
+  PeerGroup = aesim_utils:address_group(PeerAddr),
+  {ConnRef, Sim2} = aesim_node:async_connect(NodeId, PeerId, Sim),
+  {State#{outbound := Outbound#{ConnRef => PeerGroup}}, Sim2}.
 
 accept(State, ConnRef, true, Sim) ->
   #{inbound := Inbound, temporary := Temp} = State,
@@ -229,9 +248,12 @@ accept(State, _ConnRef, false, Sim) ->
   #{inbound := Inbound} = State,
   {State#{inbound := Inbound + 1}, Sim}.
 
-closed(State, Type, Sim) ->
-  #{Type := Inbound} = State,
-  {State#{Type := Inbound - 1}, Sim}.
+closed(State, _ConnRef, inbound, Sim) ->
+  #{inbound := Inbound} = State,
+  {State#{inbound := Inbound - 1}, Sim};
+closed(State, ConnRef, outbound, Sim) ->
+  #{outbound := Outbound} = State,
+  {State#{outbound := maps:remove(ConnRef, Outbound)}, Sim}.
 
 %--- EVENT FUNCTIONS -----------------------------------------------------------
 
@@ -306,12 +328,12 @@ on_peer_identified(State, PeerId, Context, Sim) ->
     true -> ignore
   end.
 
-on_connection_failed(State, _PeerId, Context, Sim) ->
-  {State2, Sim2} = closed(State, outbound, Sim),
+on_connection_failed(State, _PeerId, ConnRef, Context, Sim) ->
+  {State2, Sim2} = closed(State, ConnRef, outbound, Sim),
   start_pool_connecting(State2, Context, Sim2).
 
-on_connection_aborted(State, _PeerId, _ConnRef, ConnType, _Context, Sim) ->
-  closed(State, ConnType, Sim).
+on_connection_aborted(State, _PeerId, ConnRef, ConnType, _Context, Sim) ->
+  closed(State, ConnRef, ConnType, Sim).
 
 %% Prunes the connections, and send a ping message if it is an outbound connection.
 %% The connection may be aborted if the connection itself got pruned away.
@@ -324,10 +346,10 @@ on_connection_established(State, PeerId, ConnRef, ConnType, Context, Sim) ->
       {State2, Sim3}
   end.
 
-on_connection_terminated(State, _PeerId, _ConnRef, inbound, _Context, Sim) ->
-  closed(State, inbound, Sim);
-on_connection_terminated(State, _PeerId, _ConnRef, outbound, Context, Sim) ->
-  {State2, Sim2} = closed(State, outbound, Sim),
+on_connection_terminated(State, _PeerId, ConnRef, inbound, _Context, Sim) ->
+  closed(State, ConnRef, inbound, Sim);
+on_connection_terminated(State, _PeerId, ConnRef, outbound, Context, Sim) ->
+  {State2, Sim2} = closed(State, ConnRef, outbound, Sim),
   start_pool_connecting(State2, Context, Sim2).
 
 %--- MESSAGE FUNCTIONS ---------------------------------------------------------
@@ -376,3 +398,5 @@ cfg_soft_max_inbound(Sim) -> aesim_config:get(Sim, soft_max_inbound).
 cfg_max_outbound(Sim) -> aesim_config:get(Sim, max_outbound).
 
 cfg_connect_period(Sim) -> aesim_config:get(Sim, connect_period).
+
+cfg_limit_outbound_groups(Sim) -> aesim_config:get(Sim, limit_outbound_groups).

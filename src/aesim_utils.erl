@@ -3,9 +3,11 @@
 %=== INCLUDES ==================================================================
 
 -include_lib("stdlib/include/assert.hrl").
+-include("aesim_types.hrl").
 
 %=== EXPORTS ===================================================================
 
+-export([address_group/1]).
 -export([format/2]).
 -export([format_time/1]).
 -export([format_minimal_time/1]).
@@ -17,6 +19,10 @@
 -export([sum/1]).
 
 %=== API FUNCTIONS =============================================================
+
+
+-spec address_group(address()) -> address_group().
+address_group({{A, B, _ ,_}, _}) -> {A, B}.
 
 -spec format(string(), [term()]) -> string().
 format(Format, Params) ->
