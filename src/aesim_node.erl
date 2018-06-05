@@ -12,9 +12,10 @@
   when Opts :: map(),
        Sim :: sim().
 
--callback node_new(UsedAddresses, Context, Sim)
+-callback node_new(AddrRanges, UsedAddresses, Context, Sim)
   -> {State, Address, Sim}
-  when UsedAddresses :: address_map(),
+  when AddrRanges :: undefined | address_ranges(),
+       UsedAddresses :: address_map(),
        Context :: context(),
        Sim :: sim(),
        State :: term(),
@@ -63,7 +64,7 @@
 
 %% API functions
 -export([parse_options/2]).
--export([new/3]).
+-export([new/4]).
 -export([connections/1]).
 -export([pool/1]).
 -export([start/3]).
@@ -119,10 +120,10 @@ parse_options(Opts, Sim) ->
     {pool_mod, parse_options}
   ]).
 
--spec new(id(), address_map(), sim()) -> {state(), sim()}.
-new(NodeId, CurrAddrs, Sim) ->
+-spec new(id(), undefiend | address_ranges(), address_map(), sim()) -> {state(), sim()}.
+new(NodeId, AddrRanges, CurrAddrs, Sim) ->
   State1 = #{id => NodeId, peers => #{}, addr => undefined},
-  {State2, Sim2} = node_new(State1, CurrAddrs, Sim),
+  {State2, Sim2} = node_new(State1, AddrRanges, CurrAddrs, Sim),
   {State3, Sim3} = conns_new(State2, Sim2),
   {State4, Sim4} = pool_new(State3, Sim3),
   {State4, Sim4}.
@@ -504,10 +505,10 @@ conns_context(State) -> context(State, [pool], connections).
 
 %--- NODE CALLBACK FUNCTIONS ---------------------------------------------------
 
-node_new(State, CurrAddrs, Sim) ->
+node_new(State, AddrRanges, CurrAddrs, Sim) ->
   Context = node_context(State),
   NodeMod = cfg_node_mod(Sim),
-  {Sub, Addr, Sim2} = NodeMod:node_new(CurrAddrs, Context, Sim),
+  {Sub, Addr, Sim2} = NodeMod:node_new(AddrRanges, CurrAddrs, Context, Sim),
   {State#{sub => Sub, addr => Addr}, Sim2}.
 
 node_start(State, Trusted, Sim) ->

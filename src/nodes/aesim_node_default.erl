@@ -12,6 +12,8 @@
 %%  a random peer (not yet connected) is taken from the pool and connected to.
 %%  - Optionally limit the outbound connections to one connection per address
 %%  group.
+%%  - Accepts a file as option containing a list of IP range terms to generate
+%%  the IP from.
 
 -behaviour(aesim_node).
 
@@ -24,7 +26,7 @@
 
 %% Behaviour aesim_node callback functions
 -export([parse_options/2]).
--export([node_new/3]).
+-export([node_new/4]).
 -export([node_start/4]).
 -export([node_accept/5]).
 -export([node_handle_event/5]).
@@ -67,15 +69,15 @@ parse_options(Opts, Sim) ->
     {limit_outbound_groups, boolean, ?DEFAULT_LIMIT_OUTBOUND_GROUPS}
   ]).
 
--spec node_new(address_map(), context(), sim()) -> {state(), address(), sim()}.
-node_new(AddrMap, _Context, Sim) ->
+-spec node_new(undefined | address_ranges(), address_map(), context(), sim()) -> {state(), address(), sim()}.
+node_new(AddrRanges, AddrMap, _Context, Sim) ->
   State = #{
     temporary => #{},
     inbound => 0,
     outbound => #{},
     connecting => false
   },
-  {State, rand_address(AddrMap), Sim}.
+  {State, rand_address(AddrRanges, AddrMap), Sim}.
 
 %% Connects to all trusted peers and starts periodical connection to pooled peers.
 node_start(State, Trusted, Context, Sim) ->
@@ -126,7 +128,7 @@ report(_State, _Type, _Context, _Sim) -> #{}.
 
 %=== INTERNAL FUNCTIONS ========================================================
 
-rand_address(AddrMap) ->
+rand_address(undefined, AddrMap) ->
   %% Here we could add some logic to ensure there is nodes
   %% with the same address but with different ports.
   O1 = aesim_utils:rand(256),
@@ -136,7 +138,21 @@ rand_address(AddrMap) ->
   Port = aesim_utils:rand(1000, 65536),
   Addr = {{O1, O2, O3, O4}, Port},
   case maps:is_key(Addr, AddrMap) of
-    true -> rand_address(AddrMap);
+    true -> rand_address(undefined, AddrMap);
+    false -> Addr
+  end;
+rand_address(AddrRanges, AddrMap) ->
+  {BaseBin, Mask} = aesim_utils:rand_pick(AddrRanges),
+  RandMask = (1 bsl (32 - Mask)) - 1,
+  BaseMask = (1 bsl 32) - 1 - RandMask,
+  <<RandNum:32/unsigned-big-integer>> = crypto:strong_rand_bytes(4),
+  <<BaseNum:32/unsigned-big-integer>> = BaseBin,
+  AddrNum = (BaseNum band BaseMask) + (RandNum band RandMask),
+  <<A:8, B:8, C:8, D:8>> = <<AddrNum:32/unsigned-big-integer>>,
+  Port = aesim_utils:rand(1000, 65536),
+  Addr = {{A, B, C, D}, Port},
+  case maps:is_key(Addr, AddrMap) of
+    true -> rand_address(AddrRanges, AddrMap);
     false -> Addr
   end.
 

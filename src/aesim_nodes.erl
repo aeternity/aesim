@@ -35,6 +35,7 @@
   next_id := id(),
   trusted := neighbours(),
   addresses := address_map(),
+  addr_ranges := undefiend | address_ranges(),
   nodes := #{id() => aesim_node:state()}
 }.
 
@@ -46,7 +47,8 @@
 parse_options(Opts, Sim) ->
   aesim_config:parse(Sim, Opts, [
     {bootstrap_size, integer, ?DEFAULT_BOOTSTRAP_SIZE},
-    {trusted_count, integer, ?DEFAULT_TRUSTED_COUNT}
+    {trusted_count, integer, ?DEFAULT_TRUSTED_COUNT},
+    {address_ranges, string, ""}
   ], [
     fun aesim_node:parse_options/2
   ]).
@@ -57,6 +59,7 @@ new(Sim) ->
     next_id => 1,
     trusted => [],
     addresses => #{},
+    addr_ranges => load_address_ranges(Sim),
     nodes => #{}
   },
   {State, Sim}.
@@ -143,9 +146,26 @@ route_event(State, Addr, Name, Params, Sim) ->
 
 %=== INTERNAL FUNCTIONS ========================================================
 
+load_address_ranges(Sim) ->
+  case cfg_address_ranges(Sim) of
+    "" -> undefined;
+    FilePath ->
+      case file:consult(FilePath) of
+        {ok, Ranges} -> Ranges;
+        _X ->
+          Msg = aesim_utils:format("IP RANGE FILE NOT FOUND: ~s (~w)", [FilePath, _X]),
+          aesim_simulator:print_comment(Msg, Sim),
+          undefined
+      end
+  end.
+
 node_add(State, Sim) ->
-  #{next_id := NextId, nodes := Nodes, addresses := Addrs} = State,
-  {Node, Sim2} = aesim_node:new(NextId, Addrs, Sim),
+  #{next_id := NextId,
+    nodes := Nodes,
+    addresses := Addrs,
+    addr_ranges := Ranges
+  } = State,
+  {Node, Sim2} = aesim_node:new(NextId, Ranges, Addrs, Sim),
   #{id := NextId, addr := Addr} = Node,
   ?assertNot(maps:is_key(NextId, Nodes)),
   ?assertNot(maps:is_key(Addr, Addrs)),
@@ -173,3 +193,5 @@ post(Delay, Name, Params, Sim) ->
 cfg_bootstrap_size(Sim) -> aesim_config:get(Sim, bootstrap_size).
 
 cfg_trusted_count(Sim) -> aesim_config:get(Sim, trusted_count).
+
+cfg_address_ranges(Sim) -> aesim_config:get(Sim, address_ranges).
