@@ -438,6 +438,7 @@ peer_gossiped(State, _SourceId, SourceAddr, PeerId, PeerAddr, Sim) ->
   #{peers := Peers} = State,
   case maps:find(PeerId, Peers) of
     error ->
+      % New gossiped peer
       Peer = peer_new(default, PeerAddr, SourceAddr, Time),
       State2 = State#{peers := Peers#{PeerId => Peer}},
       forward_event(State2, peer_identified, PeerId, Sim);

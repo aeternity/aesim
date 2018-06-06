@@ -68,7 +68,10 @@
   [peers, expired],
   [gossip, received],
   [pool, known],
-  [pool, verified]
+  [pool, verified],
+  [pool, unverified],
+  [pool, downgraded],
+  [pool, removed]
 ]).
 
 -define(RRD_GRAPHS, [
@@ -82,8 +85,16 @@
     defs => {collection, "pruned", #{}}},
   #{title => "Gossip Updates Received per Node",
     defs => {collection, "gossiped", #{}}},
-  #{title => "Pooled Peers per Node",
+  #{title => "POOL: Known Peers per Node",
     defs => {collection, "known", #{}}},
+  #{title => "POOL: Verified Peers per Node",
+    defs => {collection, "verified", #{}}},
+  #{title => "POOL: Unverified Peers per Node",
+    defs => {collection, "unverified", #{}}},
+  #{title => "POOL: Downgraded Peers per Node",
+    defs => {collection, "downgraded", #{}}},
+  #{title => "POOL: Removed Peers per Node",
+    defs => {collection, "removed", #{}}},
   #{title => "Failed Connections per Node",
     defs => {collection, "failed", #{}}},
   #{title => "Retried Connections per Node",
@@ -252,6 +263,8 @@ k2i([gossip, received]) ->                  {collection, gauge, "gossiped"};
 k2i([pool, known]) ->                       {collection, gauge, "known"};
 k2i([pool, verified]) ->                    {collection, gauge, "verified"};
 k2i([pool, unverified]) ->                  {collection, gauge, "unverified"};
+k2i([pool, downgraded]) ->                  {collection, gauge, "downgraded"};
+k2i([pool, removed]) ->                     {collection, gauge, "removed"};
 k2i([peers, expired]) ->                    {collection, gauge, "expired"};
 k2i(_) ->                                   undefined.
 

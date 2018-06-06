@@ -12,6 +12,7 @@
 -export([format_time/1]).
 -export([format_minimal_time/1]).
 -export([rand/1, rand/2]).
+-export([skewed_rand/2]).
 -export([rand_take/1, rand_take/2]).
 -export([rand_pick/1, rand_pick/2, rand_pick/3]).
 -export([list_add_new/2]).
@@ -52,6 +53,14 @@ format_minimal_time(Miliseconds) ->
 %% Returns X where 0 <= X < N
 -spec rand(non_neg_integer()) -> non_neg_integer().
 rand(N) -> rand:uniform(N) - 1.
+
+%% @doc Generates a random integer with a skewed distribution.
+%% If the given skew is `1` the distribution is uniform.
+%% The more the skew is larger than `1` the more the distribution is skewed
+%% toward the small values.
+-spec skewed_rand(non_neg_integer(), float()) -> non_neg_integer().
+skewed_rand(N, Skew) ->
+  floor(N * math:pow(rand:uniform(), Skew)).
 
 %% Returns X where N <= X < M
 -spec rand(non_neg_integer(), non_neg_integer()) -> non_neg_integer().

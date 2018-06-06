@@ -17,7 +17,7 @@
 
 -type opt_name() :: atom().
 -type opt_type() :: string | integer | integer_infinity | atom | time
-                  | time_infinity | boolean.
+                  | time_infinity | boolean | float.
 -type spec() :: {opt_name(), opt_type(), term()}.
 -type specs() :: [spec()].
 -type option() :: {opt_type(), boolean(), term(), term()}.
@@ -95,6 +95,7 @@ convert(string, _Key, Value) when is_list(Value) -> Value;
 convert(_Type, Key, "") -> error({bad_option, {Key, ""}});
 convert(atom, _Key, Value) when is_atom(Value) -> Value;
 convert(integer, _Key, Value) when is_integer(Value) -> Value;
+convert(number, _Key, Value) when is_number(Value) -> Value;
 convert(boolean, _Key, "true") -> true;
 convert(boolean, _Key, "false") -> false;
 convert(boolean, _Key, "1") -> true;
@@ -114,6 +115,8 @@ convert(string, _Key, Value) when is_atom(Value) ->
   atom_to_list(Value);
 convert(string, _Key, Value) when is_integer(Value) ->
   integer_to_list(Value);
+convert(string, _Key, Value) when is_number(Value) ->
+  aesim_utils:format("~w", [Value]);
 convert(atom, _Key, Value) when is_list(Value) ->
   list_to_atom(Value);
 convert(time, Key, Value) when is_list(Value) ->
@@ -126,6 +129,18 @@ convert(Type, Key, Value)
     list_to_integer(Value)
   catch
     _:badarg -> error({bad_option, Key, Value})
+  end;
+convert(number, Key, Value) ->
+  try
+    list_to_integer(Value)
+  catch
+    _:badarg ->
+      try
+        list_to_float(Value)
+      catch
+        _:badarg ->
+          error({bad_option, Key, Value})
+      end
   end;
 convert(_Type, Key, Value) ->
   error({bad_option, Key, Value}).
