@@ -46,8 +46,9 @@ pool_count(State, all) -> maps:size(State);
 pool_count(State, verified) -> maps:size(State);
 pool_count(_State, unverified) -> 0.
 
-pool_select(State, ExcludePeerIds, ExcludePeerGroups, Context, Sim) ->
-  case filter_peers(maps:keys(State), ExcludePeerIds, ExcludePeerGroups, Context, Sim) of
+pool_select(State, ExIds, ExGroups, Context, Sim) ->
+  case aesim_pool:filter_peers(maps:keys(State), ExIds, ExGroups, ?MAX_RETRIES,
+                               fun retry_backoff/2, Context, Sim) of
     {undefined, [], Sim2} ->
       {unavailable, Sim2};
     {NextTime, [], Sim2} ->
@@ -75,6 +76,11 @@ report(State, _Type, _Context, _Sim) ->
 
 %=== INTERNAL FUNCTIONS ========================================================
 
+retry_backoff(0, _) -> undefined;
+retry_backoff(RetryCount, RetryTime) ->
+  BackoffIndex = min(RetryCount, length(?BACKOFF_TIMES)),
+  RetryTime + lists:nth(BackoffIndex, ?BACKOFF_TIMES) * 1000.
+
 add_verified(State, PeerId, Context, Sim) ->
   case maps:find(PeerId, State) of
     {ok, _} -> State;
@@ -94,46 +100,3 @@ del_verified(State, PeerId, Context, Sim) ->
       Sim3 = aesim_metrics:inc(NodeId, [pool, verified], -1, Sim2),
       {maps:remove(PeerId, State), Sim3}
   end.
-
-%% Filter out the peers that are waiting for retrying and schedule peer removal
-filter_peers(Ids, ExcludePeerIds, ExcludePeerGroups, Context, Sim0) ->
-  #{node_id := NodeId, peers := Peers} = Context,
-  #{time := Now} = Sim0,
-  lists:foldl(fun(PeerId, {Min, Acc, Sim}) ->
-    #{PeerId := Peer} = Peers,
-    #{type := Type,
-      addr := Addr,
-      retry_count := RetryCount,
-      retry_time := RetryTime
-    } = Peer,
-    AddrGroup = aesim_utils:address_group(Addr),
-    GroupIsExcluded = lists:member(AddrGroup, ExcludePeerGroups),
-    PeerIsExcluded = lists:member(PeerId, ExcludePeerIds),
-    case GroupIsExcluded or PeerIsExcluded of
-      true -> {Min, Acc, Sim};
-      false ->
-        case {Type, RetryCount, next_retry_time(RetryCount, RetryTime)} of
-          {_, 0, _} ->
-            % Peer not currently retrying
-            {Min, [PeerId | Acc], Sim};
-          {T, R, N} when R > ?MAX_RETRIES, T =/= trusted ->
-            % Peer expired the maximum retryes and is not trusted
-            Sim2 = aesim_node:async_peer_expired(NodeId, PeerId, Sim),
-            {safe_min(Min, N), Acc, Sim2};
-          {_, _, NextRetryTime} when NextRetryTime =< Now ->
-            % Peer is scheduled for retry
-            {Min, [PeerId | Acc], Sim};
-          {_, _R, N} ->
-            % Peer is not yet ready to retry
-            {safe_min(Min, N), Acc, Sim}
-        end
-    end
-  end, {undefined, [], Sim0}, Ids).
-
-next_retry_time(0, _) -> undefined;
-next_retry_time(RetryCount, RetryTime) ->
-  BackoffIndex = min(RetryCount, length(?BACKOFF_TIMES)),
-  RetryTime + lists:nth(BackoffIndex, ?BACKOFF_TIMES) * 1000.
-
-safe_min(undefined, Value2) -> Value2;
-safe_min(Value1, Value2) -> min(Value1, Value2).
