@@ -68,6 +68,7 @@
 -export([connections/1]).
 -export([pool/1]).
 -export([start/3]).
+-export([restart/3]).
 -export([connect/3]).
 -export([disconnect/3]).
 -export([disconnect_peer/3]).
@@ -141,6 +142,17 @@ start(State, Trusted, Sim) ->
   {State3, Sim3} = pool_init(State2, Trusted, Sim2),
   {State4, Sim4} = node_start(State3, Trusted, Sim3),
   {State4, Sim4}.
+
+-spec restart(state(), neighbours(), sim()) -> {state(), sim()}.
+restart(State, Trusted, Sim) ->
+  #{id := NodeId} = State,
+  {State2, Sim2} = conns_shutdown(State, Sim),
+  Sim3 = aesim_metrics:reset(NodeId, Sim2),
+  Sim4 = aesim_events:cancel_prefix([nodes, NodeId], Sim3),
+  State3 = State2#{peers => #{}},
+  {State4, Sim5} = conns_new(State3, Sim4),
+  {State5, Sim6} = pool_new(State4, Sim5),
+  start(State5, Trusted, Sim6).
 
 -spec connect(state(), id() | [id()], sim()) -> {state(), sim()}.
 connect(State, PeerIds, Sim) when is_list(PeerIds) ->
@@ -583,6 +595,12 @@ conns_new(State, Sim) ->
   Context = conns_context(State),
   {Conns, Sim2} = aesim_connections:new(Context, Sim),
   {State#{conns => Conns}, Sim2}.
+
+conns_shutdown(State, Sim) ->
+  #{conns := Conns} = State,
+  Context = conns_context(State),
+  Sim2 = aesim_connections:shutdown(Conns, Context, Sim),
+  {State#{conns => undefined}, Sim2}.
 
 conns_connect(State, Params, Sim) when is_list(Params) ->
   lists:foldl(fun({P, R}, {St, Sm}) -> conns_connect(St, P, R, Sm) end,

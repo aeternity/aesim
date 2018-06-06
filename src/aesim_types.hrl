@@ -69,6 +69,7 @@ end())).
   metrics := term(),
   sim_dir := undefined | string(),
   report_file := undefined | file:io_device(),
+  trusted := undefined | neighbours(),
   real_start_time := real_time() | undefined, % should never be undefined
   time := sim_time(),
   max_sim_time := sim_time() | infinity,

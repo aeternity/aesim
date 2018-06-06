@@ -22,6 +22,7 @@
 %% Internal API functions only used by aesim_node
 -export([parse_options/2]).
 -export([new/2]).
+-export([shutdown/3]).
 -export([connect/5]).
 -export([disconnect/4]).
 -export([disconnect_peer/4]).
@@ -86,6 +87,17 @@ new(_Context, Sim) ->
     }
   },
   {State, Sim}.
+
+-spec shutdown(state(), context(), sim()) -> sim().
+shutdown(State, Context, Sim0) ->
+  #{connections := ConnMap} = State,
+  lists:foldl(fun
+    (#{status := connected, ref := ConnRef, peer := PeerId} = Conn, Sim) ->
+        {Delay, Sim2} = conn_disconnect(Conn, Context, Sim),
+        {_, Sim3} = post_closed(Delay, PeerId, ConnRef, Sim2),
+        Sim3;
+    (_, Sim) -> Sim
+  end, Sim0, maps:values(ConnMap)).
 
 -spec count(state(), all | conn_filter() | [conn_filter()]) -> pos_integer().
 count(State, Filters) ->
