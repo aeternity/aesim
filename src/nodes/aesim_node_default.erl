@@ -71,21 +71,16 @@ parse_options(Opts, Sim) ->
 
 -spec node_new(undefined | address_ranges(), address_map(), context(), sim()) -> {state(), address(), sim()}.
 node_new(AddrRanges, AddrMap, _Context, Sim) ->
-  State = #{
-    temporary => #{},
-    inbound => 0,
-    outbound => #{},
-    connecting => false
-  },
-  {State, rand_address(AddrRanges, AddrMap), Sim}.
+  {new_state(), rand_address(AddrRanges, AddrMap), Sim}.
 
 %% Connects to all trusted peers and starts periodical connection to pooled peers.
-node_start(State, Trusted, Context, Sim) ->
+node_start(_State, Trusted, Context, Sim) ->
+  % We reset the whole state because this is called when the node restarts.
   TrustedIds = [I || {I, _} <- Trusted],
   {State2, Sim2} = lists:foldl(fun(P, {St, Sm}) ->
     {_, St2, Sm2} = maybe_connect(St, P, Context, Sm),
     {St2, Sm2}
-  end, {State, Sim}, TrustedIds),
+  end, {new_state(), Sim}, TrustedIds),
   start_pool_connecting(State2, Context, Sim2).
 
 %% Accepts all connections up to the configured maximum number of inbound connections.
@@ -127,6 +122,13 @@ node_handle_message(State, PeerId, ConnRef, Message, Context, Sim) ->
 report(_State, _Type, _Context, _Sim) -> #{}.
 
 %=== INTERNAL FUNCTIONS ========================================================
+
+new_state() ->
+  #{temporary => #{},
+    inbound => 0,
+    outbound => #{},
+    connecting => false
+  }.
 
 rand_address(undefined, AddrMap) ->
   %% Here we could add some logic to ensure there is nodes

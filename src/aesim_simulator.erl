@@ -27,7 +27,9 @@
 -define(DEFAULT_MAX_REAL_TIME,                   infinity).
 -define(DEFAULT_SCENARIO_MOD,      aesim_scenario_default).
 -define(DEFAULT_PROGRESS_INTERVAL,                   "1s").
--define(SIM_IMMUTABLES, [config, real_start_time, time, max_time,
+-define(SIM_IMMUTABLES, [config, sim_dir, report_file,
+                         real_start_time, time, max_real_time, max_sim_time,
+                         progress_counter, progress_phase,
                          progress_sim_time, progress_sim_interval,
                          progress_real_time, progress_real_interval]).
 -define(CHECK_SIM(OLD, NEW), (?assertEqual(maps:with(?SIM_IMMUTABLES, (OLD)),
@@ -61,6 +63,7 @@ run(Opts)->
     metrics => aesim_metrics:new(),
     sim_dir => undefined,
     report_file => undefined,
+    trusted => undefined,
     real_start_time => undefined,
     time => 0,
     max_real_time => infinity,

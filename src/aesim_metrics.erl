@@ -19,6 +19,7 @@
 -export([setup/1]).
 -export([cleanup/1]).
 -export([update/2]).
+-export([reset/2]).
 -export([inc/3, inc/4]).
 -export([get/2, get/3]).
 
@@ -29,6 +30,7 @@
 %=== MACROS ====================================================================
 
 -define(DEFAULT_RRD_ENABLED, false).
+-define(DEFAULT_IGNORE_TRUSTED, false).
 -define(UPDATE_INTERVAL, (60 * 1000)). % 1 minute
 -define(METRICS_DIR, "metrics").
 -define(RRD_FILE, "metrics.rrd").
@@ -125,7 +127,8 @@
 -spec parse_options(map(), sim()) -> sim().
 parse_options(Opts, Sim) ->
   aesim_config:parse(Sim, Opts, [
-    {rrd_enabled, boolean, ?DEFAULT_RRD_ENABLED}
+    {rrd_enabled, boolean, ?DEFAULT_RRD_ENABLED},
+    {rrd_ignore_trusted, boolean, ?DEFAULT_IGNORE_TRUSTED}
   ]).
 
 -spec new() -> state().
@@ -159,6 +162,16 @@ update(DataPoints, Sim) ->
   State2 = rrd_update(State, DataPoints),
   Sim#{metrics := State2}.
 
+-spec reset(id(), sim()) -> sim().
+reset(NodeId, Sim) ->
+  #{metrics := State} = Sim,
+  #{nodes := NodesMetrics} = State,
+  case maps:take(NodeId, NodesMetrics) of
+    error -> Sim;
+    {_, NodesMetrics2} ->
+      Sim#{metrics := State#{nodes := NodesMetrics2}}
+  end.
+
 -spec inc(metric_name(), integer(), sim()) -> sim().
 inc(_Name, 0, Sim) -> Sim;
 inc(Name, Inc, Sim) ->
@@ -170,14 +183,18 @@ inc(Name, Inc, Sim) ->
 -spec inc(id(), metric_name(), integer(), sim()) -> sim().
 inc(_NodeId, _Name, 0, Sim) -> Sim;
 inc(NodeId, Name, Inc, Sim) ->
-  #{metrics := State} = Sim,
-  #{nodes := NodesMetrics} = State,
-  NodeMetrics = case maps:find(NodeId, NodesMetrics) of
-    error -> new_metrics();
-    {ok, Value} -> Value
-  end,
-  NodeMetrics2 = metrics_inc(NodeMetrics, Name, Inc),
-  Sim#{metrics := State#{nodes := NodesMetrics#{NodeId => NodeMetrics2}}}.
+  #{trusted := Trusted, metrics := State} = Sim,
+  case {cfg_rrd_ignore_trusted(Sim), lists:keyfind(NodeId, 1, Trusted)} of
+    {true, {_, _}} -> Sim;
+    _ ->
+      #{nodes := NodesMetrics} = State,
+      NodeMetrics = case maps:find(NodeId, NodesMetrics) of
+        error -> new_metrics();
+        {ok, Value} -> Value
+      end,
+      NodeMetrics2 = metrics_inc(NodeMetrics, Name, Inc),
+      Sim#{metrics := State#{nodes := NodesMetrics#{NodeId => NodeMetrics2}}}
+  end.
 
 -spec get(metric_name(), sim()) -> integer().
 get(Name, Sim) ->
@@ -465,3 +482,5 @@ make_rrd_update(StartTime, Datapoint, Updates) ->
 %--- CONFIG FUNCTIONS ----------------------------------------------------------
 
 cfg_rrd_enabled(Sim) -> aesim_config:get(Sim, rrd_enabled).
+
+cfg_rrd_ignore_trusted(Sim) -> aesim_config:get(Sim, rrd_ignore_trusted).

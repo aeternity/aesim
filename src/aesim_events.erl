@@ -11,6 +11,7 @@
 -export([post/5, post/6]).
 -export([cancel/2]).
 -export([cancel_tagged/2]).
+-export([cancel_prefix/2]).
 
 -export([size/1]).
 -export([next/1]).
@@ -66,6 +67,11 @@ cancel(EventRef, Sim) ->
 cancel_tagged(Tag, Sim) ->
   #{events := State} = Sim,
   Sim#{events := del_tagged(State, Tag)}.
+
+-spec cancel_prefix(event_addr(), sim()) -> sim().
+cancel_prefix(Prefix, Sim) ->
+  #{events := State} = Sim,
+  Sim#{events := del_prefix(State, Prefix)}.
 
 -spec size(sim()) -> non_neg_integer().
 size(#{events := State}) ->
@@ -155,7 +161,31 @@ del_tagged(State, Tag) ->
   case maps:take(Tag, Tags) of
     error -> State;
     {Keys, Tags2} ->
-      State#{sched := gbtree_without(Keys, Events), tags := Tags2}
+      State#{sched := gbtrees_without(Keys, Events), tags := Tags2}
+  end.
+
+del_prefix(State, Prefix) ->
+  #{queue := Queue, sched := Events, tags := Tags} = State,
+  QueueFilterFun = fun({Target, _, _}) -> not lists:prefix(Prefix, Target) end,
+  Queue2 = queue:filter(QueueFilterFun, Queue),
+  {Events2, Tags2} = gbtrees_del_prefix(Prefix, Events, Tags),
+  State#{queue := Queue2, sched := Events2, tags := Tags2}.
+
+gbtrees_del_prefix(Prefix, Tree, Tags) ->
+  gbtrees_del_prefix(Prefix, Tree, Tags, gb_trees:iterator(Tree)).
+
+gbtrees_del_prefix(Prefix, Tree, Tags, Iter) ->
+  case gb_trees:next(Iter) of
+    none -> {Tree, Tags};
+    {Ref, {Tag, Target, _, _}, Iter2} ->
+      case lists:prefix(Prefix, Target) of
+        false ->
+          gbtrees_del_prefix(Prefix, Tree, Tags, Iter2);
+        true ->
+          Tree2 = gb_trees:delete(Ref, Tree),
+          Tags2 = del_tag(Tags, Tag, Ref),
+          gbtrees_del_prefix(Prefix, Tree2, Tags2, Iter2)
+      end
   end.
 
 add_tag(Tags, undefined, _Key) -> Tags;
@@ -171,5 +201,5 @@ del_tag(Tags, Tag, Key) ->
     Keys2 -> Tags#{Tag := Keys2}
   end.
 
-gbtree_without(Keys, Tree) ->
+gbtrees_without(Keys, Tree) ->
   lists:foldl(fun(K, T) -> gb_trees:delete_any(K, T) end, Tree, Keys).

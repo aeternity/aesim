@@ -17,7 +17,7 @@
 
 -type opt_name() :: atom().
 -type opt_type() :: string | integer | integer_infinity | atom | time
-                  | time_infinity | boolean | float.
+                  | time_infinity | boolean | number.
 -type spec() :: {opt_name(), opt_type(), term()}.
 -type specs() :: [spec()].
 -type option() :: {opt_type(), boolean(), term(), term()}.
@@ -69,7 +69,7 @@ print_config(Sim) ->
   #{config := State} = Sim,
   lists:foreach(fun({N, {T, D, S, _}}) ->
     DefStr = if D -> "(default)"; true -> "" end,
-    aesim_simulator:print("~-20s: ~30s ~-17w ~9s~n", [N, S, T, DefStr], Sim)
+    aesim_simulator:print("~-22s: ~27s ~-17w ~9s~n", [N, S, T, DefStr], Sim)
   end, lists:keysort(1, maps:to_list(State))).
 
 %=== INTERNAL FUNCTIONS ========================================================

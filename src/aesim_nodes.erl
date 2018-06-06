@@ -15,6 +15,7 @@
 -export([count/1]).
 -export([bootstrap/2]).
 -export([start_node/2]).
+-export([restart_node/3]).
 -export([report/3]).
 -export([node_report/4]).
 
@@ -89,16 +90,21 @@ bootstrap(State, Sim) ->
   TrustedCount = cfg_trusted_count(Sim),
   TrustedNeighbours = aesim_utils:rand_pick(TrustedCount, Neighbours),
   State3 = State2#{trusted := TrustedNeighbours},
+  Sim3 = Sim2#{trusted := TrustedNeighbours},
   % Start all the nodes
   lists:foldl(fun({NodeId, _}, {St, Sm}) ->
     node_start(St, NodeId, Sm)
-  end, {State3, Sim2}, Neighbours).
+  end, {State3, Sim3}, Neighbours).
 
 -spec start_node(state(), sim()) -> {state(), id(), sim()}.
 start_node(State, Sim) ->
   {State2, NodeId, _NodeAddr,Sim2} = node_add(State, Sim),
   {State3, Sim3} = node_start(State2, NodeId, Sim2),
   {State3, NodeId, Sim3}.
+
+-spec restart_node(state(), id(), sim()) -> {state(), sim()}.
+restart_node(State, NodeId, Sim) ->
+  node_restart(State, NodeId, Sim).
 
 -spec report(state(), report_type(), sim()) -> map().
 report(State, Type, Sim) ->
@@ -180,6 +186,14 @@ node_start(State, NodeId, Sim) ->
   #{NodeId := Node} = Nodes,
   Trusted = [{Id, Addr} || {Id, Addr} <- AllTrusted, Id =/= NodeId],
   {Node2, Sim3} = aesim_node:start(Node, Trusted, Sim2),
+  Nodes2 = Nodes#{NodeId := Node2},
+  {State#{nodes := Nodes2}, Sim3}.
+
+node_restart(State, NodeId, Sim) ->
+  #{nodes := Nodes, trusted := AllTrusted} = State,
+  #{NodeId := Node} = Nodes,
+  Trusted = [{Id, Addr} || {Id, Addr} <- AllTrusted, Id =/= NodeId],
+  {Node2, Sim3} = aesim_node:restart(Node, Trusted, Sim),
   Nodes2 = Nodes#{NodeId := Node2},
   {State#{nodes := Nodes2}, Sim3}.
 
