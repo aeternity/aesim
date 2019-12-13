@@ -6,7 +6,7 @@
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"lager">>,
   {git,"https://github.com/aeternity/lager.git",
-       {ref,"295d6031ede2a052b87653090789150458837bbd"}},
+       {ref,"9d97ae33acd82fcf1f6772e9937e6fbbcbfae6a6"}},
   0}]}.
 [
 {pkg_hash,[
