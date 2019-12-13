@@ -7,7 +7,7 @@ connect_period      :                              0 integer_infinity  (default)
 disconnect_delay    :                             50 integer           (default)
 first_ping_delay    :                            100 time              (default)
 gossiped_neighbours :                             30 integer           (default)
-max_inbound         :                       infinity integer_infinity  (default)
+max_inbound         :                           1000 integer_infinity           
 max_nodes           :                            300 integer                    
 max_outbound        :                             10 integer_infinity           
 max_real_time       :                       infinity time_infinity     (default)
@@ -22,48 +22,50 @@ reject_delay        :                             50 integer           (default)
 reject_iprob        :                       infinity integer_infinity  (default)
 rrd_enabled         :                           true boolean                    
 scenario_mod        :         aesim_scenario_default atom              (default)
+soft_max_inbound    :                       infinity integer_infinity  (default)
 trusted_count       :                              2 integer           (default)
 ### SIMULATION #################################################################
 PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
-     21%   0h00m01s000   0h39m31s800      2372x      2372x    82     797     798
-     29%   0h00m02s000   0h52m33s000       781x      1577x   108    1057    1058
-     35%   0h00m03s000   1h03m00s750       628x      1260x   129    1267    1269
-     39%   0h00m04s000   1h10m33s150       452x      1058x   144    1417    1418
-     43%   0h00m05s000   1h17m33s400       420x       931x   158    1557    1558
-     46%   0h00m06s000   1h24m00s700       387x       840x   171    1687    1689
-     49%   0h00m07s000   1h29m31s350       331x       767x   182    1797    1798
-     52%   0h00m08s000   1h34m32s550       301x       709x   192    1897    1898
-     55%   0h00m09s000   1h39m04s550       272x       661x   201    1987    1988
-     57%   0h00m10s000   1h43m32s900       268x       621x   210    2077    2078
-     59%   0h00m11s000   1h47m34s700       242x       587x   218    2157    2158
-     61%   0h00m12s000   1h51m33s700       239x       558x   226    2237    2238
-     63%   0h00m13s000   1h55m06s200       213x       531x   233    2307    2308
-     66%   0h00m14s000   1h59m01s200       235x       510x   241    2387    2388
-     67%   0h00m15s000   2h02m06s500       185x       488x   247    2447    2448
-     69%   0h00m16s000   2h05m32s900       206x       471x   254    2517    2518
-     71%   0h00m17s000   2h08m33s400       181x       454x   260    2577    2578
-     73%   0h00m18s000   2h11m33s000       180x       439x   266    2637    2638
-     74%   0h00m19s006   2h14m06s600       153x       423x   271    2687    2688
-     76%   0h00m20s006   2h17m05s250       179x       411x   277    2747    2748
-     77%   0h00m21s006   2h20m00s700       175x       400x   283    2807    2808
-     79%   0h00m22s006   2h22m32s400       152x       389x   288    2857    2859
-     80%   0h00m23s006   2h25m01s900       150x       378x   293    2907    2908
-     81%   0h00m24s006   2h27m31s200       149x       369x   298    2957    2959
-     83%   0h00m25s006   2h30m00s850       150x       360x   300    2977    2977
-     84%   0h00m26s006   2h32m31s100       150x       352x   300    2977    2977
-     86%   0h00m27s006   2h35m02s900       152x       344x   300    2977    2977
-     87%   0h00m28s006   2h37m34s500       152x       338x   300    2977    2977
-     88%   0h00m29s006   2h40m06s100       152x       331x   300    2977    2977
-     90%   0h00m30s006   2h42m38s400       152x       325x   300    2977    2977
-     91%   0h00m31s006   2h45m33s400       175x       320x   300    2977    2977
-     93%   0h00m32s006   2h48m05s600       152x       315x   300    2977    2977
-     94%   0h00m33s006   2h50m36s700       151x       310x   300    2977    2977
-     96%   0h00m34s006   2h53m08s700       152x       305x   300    2977    2977
-     97%   0h00m35s006   2h56m03s900       175x       302x   300    2977    2977
-     99%   0h00m36s006   2h58m35s600       152x       298x   300    2977    2977
+     21%   0h00m01s000   0h38m31s100      2311x      2311x    80     781     783
+     28%   0h00m02s000   0h51m31s800       781x      1546x   106    1041    1042
+     34%   0h00m03s000   1h01m31s500       600x      1231x   126    1241    1243
+     38%   0h00m04s000   1h09m31s850       480x      1043x   142    1401    1402
+     42%   0h00m05s000   1h16m03s100       391x       913x   155    1531    1532
+     45%   0h00m06s000   1h22m03s650       361x       821x   167    1651    1652
+     48%   0h00m07s000   1h27m31s600       328x       750x   178    1761    1762
+     51%   0h00m08s000   1h32m32s100       301x       694x   188    1861    1862
+     53%   0h00m09s000   1h37m03s400       271x       647x   197    1951    1952
+     56%   0h00m10s000   1h41m32s800       269x       609x   206    2041    2042
+     58%   0h00m11s000   1h45m34s000       241x       576x   214    2121    2122
+     60%   0h00m12s000   1h49m32s200       238x       548x   222    2201    2202
+     62%   0h00m13s000   1h53m04s250       212x       522x   229    2271    2272
+     64%   0h00m14s000   1h56m35s200       211x       500x   236    2341    2342
+     66%   0h00m15s000   2h00m02s400       207x       480x   243    2411    2412
+     68%   0h00m16s000   2h03m03s700       181x       461x   249    2471    2472
+     70%   0h00m17s000   2h06m06s500       183x       445x   255    2531    2532
+     71%   0h00m18s000   2h09m06s550       180x       430x   261    2591    2592
+     73%   0h00m19s000   2h12m05s000       178x       417x   267    2651    2652
+     75%   0h00m20s000   2h15m01s600       177x       405x   273    2711    2712
+     76%   0h00m21s000   2h17m34s500       153x       393x   278    2761    2763
+     77%   0h00m22s000   2h20m06s900       152x       382x   283    2811    2812
+     79%   0h00m23s000   2h23m00s900       174x       373x   289    2871    2872
+     80%   0h00m24s000   2h25m30s550       150x       364x   294    2921    2922
+     82%   0h00m25s000   2h27m36s400       126x       354x   298    2961    2962
+     83%   0h00m26s000   2h30m06s100       150x       346x   300    2981    2981
+     84%   0h00m27s000   2h32m35s800       150x       339x   300    2981    2981
+     86%   0h00m28s000   2h35m07s500       152x       332x   300    2981    2981
+     87%   0h00m29s000   2h38m00s850       173x       327x   300    2981    2981
+     89%   0h00m30s000   2h40m32s100       151x       321x   300    2981    2981
+     90%   0h00m31s000   2h43m04s100       152x       316x   300    2981    2981
+     91%   0h00m32s000   2h45m35s800       152x       310x   300    2981    2981
+     93%   0h00m33s000   2h48m07s300       152x       306x   300    2981    2981
+     95%   0h00m34s000   2h51m02s250       175x       302x   300    2981    2981
+     96%   0h00m35s000   2h53m32s500       150x       298x   300    2981    2981
+     97%   0h00m36s000   2h56m02s100       150x       293x   300    2981    2981
+     99%   0h00m37s000   2h58m33s300       151x       290x   300    2981    2981
 ### EVENTS STATUS ##############################################################
 conn_send     :      1 event(s) for    1 target(s)
-do_ping       :   2976 event(s) for  299 target(s)
+do_ping       :   2980 event(s) for  299 target(s)
 ### NODES STATUS ###############################################################
 DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
 Inbound connections                                    0      10       5     299
@@ -81,18 +83,18 @@ Nodes with the MOST outbound connections:
 Nodes with the LESS outbound connections:
   Node    2:     0 connection(s) (trusted)
   Node    1:     1 connection(s) (trusted)
-  Node    5:     9 connection(s)
-  Node    3:     9 connection(s)
+  Node  234:    10 connection(s)
+  Node  261:    10 connection(s)
 Nodes with the MOST inbound connections:
   Node    2:   299 connection(s) (trusted)
   Node    1:   298 connection(s) (trusted)
-  Node   10:    42 connection(s)
-  Node    3:    38 connection(s)
+  Node    5:    42 connection(s)
+  Node    3:    41 connection(s)
 Nodes with the LESS inbound connections:
-  Node  261:     0 connection(s)
+  Node  234:     0 connection(s)
   Node  278:     0 connection(s)
   Node  295:     0 connection(s)
-  Node  257:     0 connection(s)
+  Node  284:     0 connection(s)
 Nodes with the MOST pooled verified peers:
   Node  234:   299 peer(s)
   Node  261:   299 peer(s)
@@ -105,23 +107,23 @@ Nodes with the LESS pooled verified peers:
   Node  278:   299 peer(s)
 ### NODES METRICS ##############################################################
 DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
-connections.accepted                                   1      11       7     299
-connections.connect                                    1      10      10      11
-connections.count.inbound                              1      11       7     299
+connections.accepted                                   1      11       6     299
+connections.connect                                    1      10      10      12
+connections.count.inbound                              1      11       6     299
 connections.count.outbound                             0      10      10      10
 connections.disconnect                                 1       1       1       1
-connections.established.inbound                        1      11       7     299
+connections.established.inbound                        1      11       6     299
 connections.established.outbound                       1      10      10      11
 connections.pruned                                     1       1       1       1
 connections.terminated.inbound                         1       1       1       1
 connections.terminated.outbound                        1       1       1       1
-gossip.received                                      160    1055     734   15958
+gossip.received                                      160    1058     712   15958
 pool.known                                           299     299     299     299
 pool.verified                                        299     299     299     299
 ### METRICS GRAPHS #############################################################
-DATABASE: /home/sylane/Workspace/aeternity/aesim/simulations/20180528162103297/metrics/metrics.rrd
-RRDTOOL PARAMETERS: --start 1527458400 --end 1527469200
-INDEX: file:///home/sylane/Workspace/aeternity/aesim/simulations/20180528162103297/metrics/metrics.html
+DATABASE: /home/sylane/Workspace/aeternity/aesim/simulations/20180601184652705/metrics/metrics.rrd
+RRDTOOL PARAMETERS: --start 1527804000 --end 1527814800
+INDEX: file:///home/sylane/Workspace/aeternity/aesim/simulations/20180601184652705/metrics/metrics.html
 ################################################################################
 ### SIMULATION DONE : normal ###################################################
 ################################################################################

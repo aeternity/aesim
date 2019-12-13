@@ -136,7 +136,7 @@ of 10 outbound connections and 1000 inbound connections.
 
 The [report](report/limited-connections/simple/report.txt) and
 [metrics](report/limited-connections/simple/metrics/metrics.md) can be
-consulted in the 'report/current/limited-connections' directory.
+consulted in the 'report/limited-connections/simple' directory.
 
 ##### Distribution of Inbound/Outbound Connections
 
@@ -182,7 +182,7 @@ Because each node (besides the trusted ones) have a lot fewer connections,
 the gossip protocol takes more time to reach the point where a new node knows
 90% of the other nodes. The simulation shows that the median time for a node
 joining the cluster to know 90% of the cluster is 4 minutes with the maximum
-being 4 minutes and 21 seconds.
+being 4 minutes and 19 seconds.
 
 #### Enhancement Proposal
 
@@ -218,3 +218,71 @@ when restarting, it will only connect to a limited number of the peers,
 so if they are heavily poisoned by an attacker there is a probability
 of the node getting isolated. So with limited outbound connections, special
 attention should be taken in preventing the pool to get poisoned.
+
+
+Soft Limit on Inbound Connections
+---------------------------------
+
+### Protocol Description
+
+This is the same protocol as [Current Protocol](#current-protocol) with the
+only difference that the number of inbound/outbound connection is limited.
+In addition, a soft limit for inbound connection can be specified
+
+The soft limit means that the nodes will accept connection even when passed the
+limit, but will close the connection right after responding to the ping
+message.
+
+### Simple Simulation
+
+Same as [Current Protocol](#current-protocol) simple simulation with a limit
+of 10 outbound connections and a soft limit of 100 inbound connections.
+
+#### Command line
+
+  `aesim max_sim_time=3h max_nodes=300 max_outbound=10 soft_max_inbound=100 rrd_enabled=true`
+
+#### Results
+
+The [report](report/soft-inbound-limit/simple/report.txt) and
+[metrics](report/soft-inbound-limit/simple/metrics/metrics.md) can be
+consulted in the 'report/soft-inbound-limit/simple' directory.
+
+##### Distribution of Inbound/Outbound Connections
+
+With the soft limit on inbound connections, the trusted nodes are now able to
+reach the 10 outbound connections. This is very important if we only relay
+blocks through the outbound connections. In addition, the trusted nodes are able
+to enforce a limit on inbound connections without preventing any new node from
+joining the cluster.
+
+##### Sybil Attack
+
+Adding a soft limit on inbound connections should not make a node more exposed
+to Sybil attacks. Only the trusted servers may marginally be more exposed by
+having less inbound connections.
+
+### Cluster Discovery Time
+
+Same as [Current Protocol](#current-protocol) cluster discovery time simulation
+with a limit of 10 outbound connections and a soft limit of 100 inbound
+connections.
+
+#### Command line
+
+  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h max_nodes=320 max_outbound=10 soft_max_inbound=100`
+
+#### Results
+
+The [report](report/soft-inbound-limit/gossip-time/report.txt) can be consulted
+in the 'report/soft-inbound-limit/gossip-time' directory.
+
+Because the trusted nodes close the connection right after responding to the
+ping message when the soft limit is reached, the node are forced to connect
+to another node right away, speeding up the gossip protocol (no need to wait
+2 minutes for the second ping). The result is a median time of 2 minutes and
+and 1 seconds to discover 90% of the cluster with a maximum of 4 minutes and 23
+seconds.
+
+So far from making the gossip protocol slower, reducing the maximum number
+of inbound connection make it faster.
