@@ -4,8 +4,8 @@
 %  - Accepts all the connections.
 %  - Defines the default delay for connect, accept and disconnect.
 %  - Optionally reject connection based on the option reject_iprob.
-%    The option define the inverse of the probability as an integer;
-%    If set to 100, connection will be rejected 1 time out of 100.
+%    The option define the percentage of rejected connections.
+%    If set to 50, 50% of connections will be rejected.
 
 %=== INCLUDES ==================================================================
 
@@ -29,7 +29,7 @@
 -define(DEFAULT_ACCEPT_DELAY,           50).
 -define(DEFAULT_REJECT_DELAY,           50).
 -define(DEFAULT_DISCONNECT_DELAY,       50).
--define(DEFAULT_REJECT_IPROB,     infinity).
+-define(DEFAULT_REJECT_IPROB,            0).
 
 %=== BEHAVIOUR aesim_connection CALLBACK FUNCTIONS =============================
 
@@ -39,7 +39,7 @@ parse_options(Opts, Sim) ->
     {accept_delay, integer, ?DEFAULT_ACCEPT_DELAY},
     {reject_delay, integer, ?DEFAULT_REJECT_DELAY},
     {disconnect_delay, integer, ?DEFAULT_DISCONNECT_DELAY},
-    {reject_iprob, integer_infinity, ?DEFAULT_REJECT_IPROB}
+    {reject_iprob, integer, ?DEFAULT_REJECT_IPROB}
   ]).
 
 conn_new(_Context, Sim) ->
@@ -50,12 +50,14 @@ conn_connect(State, _Context, Sim) ->
 
 conn_accept(State, _Opts, _Context, Sim) ->
   case cfg_reject_iprob(Sim) of
-    infinity ->
+    0 ->
       {accept, State, cfg_accept_delay(Sim), Sim};
     IProb ->
-      case aesim_utils:rand(IProb) of
-        0 -> {reject, cfg_reject_delay(Sim), Sim};
-        _ -> {accept, State, cfg_accept_delay(Sim), Sim}
+      case aesim_utils:rand(100) + 1 of
+        N when N =< IProb ->
+              {reject, cfg_reject_delay(Sim), Sim};
+        _ ->
+              {accept, State, cfg_accept_delay(Sim), Sim}
       end
   end.
 
