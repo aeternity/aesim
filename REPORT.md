@@ -219,3 +219,43 @@ when restarting, it will only connect to a limited number of the peers,
 so if they are heavily poisoned by an attacker there is a probability
 of the node getting isolated. So with limited outbound connections, special
 attention should be taken in preventing the pool to get poisoned.
+
+Current Protocol With Connection Limitation - Smaller Network
+---------------------------------------------------------------
+
+### Protocol Description
+
+This is the same protocol as [Current Protocol](#current-protocol) with the
+only difference that the number of inbound/outbound connection is limited.
+
+### Simple Simulation
+
+Same as [Current Protocol](#current-protocol) simple simulation with a limit
+of 10 outbound connections and 100 inbound connections (soft limit). Also,
+maximum number of nodes is set to 100, which is more realistic scenario as
+it's unlikely there is more than ~100 nodes (on mainnet or testnet).
+
+#### Command Line
+
+  `aesim max_sim_time=3h max_nodes=100 max_outbound=10 soft_max_inbound=100 max_inbound=1000 rrd_enabled=true`
+
+#### Results
+
+The [report](report/limited-connections/simple2/report.txt) and
+[metrics](report/limited-connections/simple2/metrics/metrics.md) can be
+consulted in the 'report/limited-connections/simple2' directory.
+
+### Cluster Discovery Time
+
+Same as [Current Protocol](#current-protocol) cluster discovery time simulation
+with a limit of 10 outbound connections and 100 inbound connections (soft
+limit). The maximum number of nodes is set to 100.
+
+#### Command line
+
+  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h max_nodes=100 max_outbound=10 soft_max_inbound=100 max_inbound=1000`
+
+#### Results
+
+The [report](report/limited-connections/gossip-time2/report.txt) can be consulted
+in the 'report/limited-connections/gossip-time2' directory.
