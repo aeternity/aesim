@@ -11,8 +11,8 @@ Current Protocol
 * Connect to all trusted nodes.
 * Start pinging all outbound connections.
 * Send a new ping 2 minutes after a ping response is received.
-* Send up to 30 random peers in each ping.
-* Respond to all pings with 30 random peers excluding the received ones.
+* Send up to 32 random peers in each ping.
+* Respond to all pings with 32 random peers excluding the received ones.
 * Add all gossiped peers to the pool and connect to them.
 * Accept all inbound connections.
 * Add the peer that connects to the node to the pool only after receiving the
