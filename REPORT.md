@@ -167,11 +167,12 @@ stay isolated.
 ### Cluster Discovery Time
 
 Same as [Current Protocol](#current-protocol) cluster discovery time simulation
-with a limit of 10 outbound connections and 1000 inbound connections.
+with a limit of 10 outbound connections and 100 inbound connections (soft
+limit).
 
 #### Command line
 
-  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h max_nodes=320 max_outbound=10 max_inbound=1000`
+  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h max_nodes=320 max_outbound=10 soft_max_inbound=100 max_inbound=1000`
 
 #### Results
 
