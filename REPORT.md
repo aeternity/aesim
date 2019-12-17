@@ -259,3 +259,44 @@ limit). The maximum number of nodes is set to 100.
 
 The [report](report/limited-connections/gossip-time2/report.txt) can be consulted
 in the 'report/limited-connections/gossip-time2' directory.
+
+Current Protocol With Connection Limitation - Larger Network
+---------------------------------------------------------------
+
+### Protocol Description
+
+This is the same protocol as [Current Protocol](#current-protocol) with the
+only difference that the number of inbound/outbound connection is limited.
+
+### Simple Simulation
+
+Same as [Current Protocol](#current-protocol) simple simulation with a limit
+of 10 outbound connections and 100 inbound connections (soft limit). The
+simulation starts with 1000 nodes, maximum number of nodes is 2000. The most
+important aspect of this simulation is connection rejection probability, which
+is set to 99% (only 1% of connection attempts succeeds).
+
+#### Command Line
+
+  `aesim max_sim_time=3h bootstrap_size=1000 max_nodes=2000 reject_iprob=99 max_outbound=10 soft_max_inbound=100 max_inbound=1000 rrd_enabled=true`
+
+#### Results
+
+The [report](report/limited-connections/simple3/report.txt) and
+[metrics](report/limited-connections/simple3/metrics/metrics.md) can be
+consulted in the 'report/limited-connections/simple3' directory.
+
+### Cluster Discovery Time
+
+Same as [Current Protocol](#current-protocol) cluster discovery time simulation
+with a limit of 10 outbound connections and 100 inbound connections (soft
+limit). The simulation starts with 1000 nodes, maximum number of nodes is 2000
+and conenctions rejection probabilty is 99%.
+
+#### Command line
+
+  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h bootstrap_size=1000 max_nodes=2000 reject_iprob=99 max_outbound=10 soft_max_inbound=100 max_inbound=1000`
+
+#### Results
+
+TODO: simulation timeout.

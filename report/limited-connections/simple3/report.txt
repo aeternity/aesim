@@ -1,0 +1,233 @@
+### CONFIGURATION ##############################################################
+accept_delay          :                          50 integer           (default)
+address_ranges        :                             string            (default)
+bootstrap_size        :                        1000 integer                    
+conn_mod              :    aesim_connection_default atom              (default)
+connect_delay         :                         100 integer           (default)
+connect_period        :                           0 integer_infinity  (default)
+disconnect_delay      :                          50 integer           (default)
+first_ping_delay      :                         100 time              (default)
+gossiped_neighbours   :                          32 integer           (default)
+limit_outbound_groups :                       false boolean           (default)
+max_inbound           :                        1000 integer_infinity           
+max_nodes             :                        2000 integer                    
+max_outbound          :                          10 integer_infinity           
+max_real_time         :                    infinity time_infinity     (default)
+max_sim_time          :                          3h time_infinity              
+node_mod              :          aesim_node_default atom              (default)
+node_start_period     :                         30s time              (default)
+ping_period           :                          2m time              (default)
+pong_delay            :                         100 time              (default)
+pool_mod              :           aesim_pool_simple atom              (default)
+progress_interval     :                          1s time              (default)
+reject_delay          :                          50 integer           (default)
+reject_iprob          :                          99 integer                    
+rrd_enabled           :                        true boolean                    
+rrd_ignore_trusted    :                       false boolean           (default)
+scenario_mod          :      aesim_scenario_default atom              (default)
+soft_max_inbound      :                         100 integer_infinity           
+trusted_count         :                           2 integer           (default)
+### SIMULATION #################################################################
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+      1%   0h00m01s000   0h02m21s350       141x       141x  1004     230    1231
+      2%   0h00m02s000   0h03m50s900        90x       115x  1007    2091    2357
+      2%   0h00m03s000   0h04m12s400        22x        84x  1008     717    1684
+      2%   0h00m04s000   0h05m03s000        51x        76x  1010     591    1592
+      3%   0h00m05s000   0h06m32s550        90x        79x  1013     709    1702
+      4%   0h00m06s000   0h08m51s900       139x        89x  1017     932    1907
+      5%   0h00m07s000   0h09m44s050        52x        83x  1019     852    1840
+      6%   0h00m08s000   0h11m07s400        83x        83x  1022     898    1892
+      7%   0h00m09s000   0h12m45s100        98x        85x  1025    1031    1989
+      9%   0h00m10s000   0h16m12s400       207x        97x  1032    1014    2002
+     10%   0h00m11s000   0h18m57s100       165x       103x  1037    1216    2184
+     11%   0h00m12s000   0h20m04s050        67x       100x  1040    1170    2156
+     12%   0h00m13s000   0h21m55s550       112x       101x  1043    1226    2196
+     13%   0h00m14s000   0h24m58s450       183x       107x  1049    1285    2248
+     16%   0h00m15s000   0h28m52s950       235x       116x  1057    1431    2381
+     16%   0h00m16s000   0h30m06s150        73x       113x  1060    1415    2371
+     18%   0h00m17s000   0h32m57s850       172x       116x  1065    1471    2414
+     20%   0h00m18s000   0h37m13s150       255x       124x  1074    1510    2456
+     21%   0h00m19s000   0h38m59s050       106x       123x  1077    1674    2603
+     22%   0h00m20s000   0h39m58s300        59x       120x  1079    1652    2586
+     23%   0h00m21s000   0h42m39s250       161x       122x  1085    1700    2634
+     25%   0h00m22s003   0h45m35s650       176x       124x  1091    1726    2660
+     27%   0h00m23s003   0h48m51s750       196x       127x  1097    1904    2824
+     27%   0h00m24s003   0h49m27s650        36x       124x  1098    1842    2787
+     28%   0h00m25s003   0h51m13s850       106x       123x  1102    1887    2814
+     30%   0h00m26s003   0h54m34s950       201x       126x  1109    1916    2841
+     32%   0h00m27s003   0h58m11s200       216x       129x  1116    1939    2867
+     32%   0h00m28s003   0h59m14s350        63x       127x  1118    2049    2996
+     33%   0h00m29s003   1h00m42s550        88x       126x  1121    2093    3039
+     34%   0h00m30s003   1h02m06s950        84x       124x  1124    2080    3004
+     35%   0h00m31s003   1h04m43s300       156x       125x  1129    2110    3035
+     37%   0h00m32s003   1h06m58s450       135x       126x  1133    2141    3069
+     38%   0h00m33s003   1h08m57s100       119x       125x  1137    2396    3326
+     38%   0h00m34s003   1h09m34s850        38x       123x  1139    2263    3203
+     39%   0h00m35s003   1h10m24s150        49x       121x  1140    2317    3253
+     39%   0h00m36s003   1h11m16s250        52x       119x  1142    2355    3270
+     40%   0h00m37s003   1h12m55s650        99x       118x  1145    2385    3299
+     41%   0h00m38s003   1h14m52s850       117x       118x  1149    2402    3320
+     42%   0h00m39s003   1h17m01s700       129x       118x  1154    2416    3336
+     43%   0h00m40s003   1h18m54s800       113x       118x  1157    2482    3411
+     44%   0h00m41s003   1h19m46s750        52x       117x  1159    2538    3463
+     45%   0h00m42s003   1h21m15s900        89x       116x  1162    2559    3469
+     46%   0h00m43s003   1h23m06s000       110x       116x  1166    2586    3501
+     47%   0h00m44s003   1h25m01s600       116x       116x  1170    2609    3522
+     48%   0h00m45s003   1h27m36s800       155x       117x  1175    2614    3532
+     49%   0h00m46s003   1h29m12s850        96x       116x  1178    2761    3684
+     50%   0h00m47s003   1h30m09s600        57x       115x  1180    2716    3647
+     50%   0h00m48s003   1h31m33s150        84x       114x  1183    2749    3665
+     51%   0h00m49s003   1h33m02s750        90x       114x  1186    2748    3665
+     52%   0h00m50s003   1h35m01s950       119x       114x  1190    2761    3682
+     53%   0h00m51s003   1h37m01s950       120x       114x  1194    2776    3697
+     54%   0h00m52s003   1h38m53s950       112x       114x  1197    2830    3764
+     55%   0h00m53s003   1h39m41s600        48x       113x  1199    2864    3801
+     56%   0h00m54s003   1h40m51s850        70x       112x  1201    2904    3834
+     56%   0h00m55s003   1h41m55s850        64x       111x  1203    2927    3843
+     57%   0h00m56s013   1h43m27s500        91x       111x  1206    2948    3864
+     58%   0h00m57s013   1h45m04s650        97x       111x  1210    2966    3886
+     59%   0h00m58s013   1h46m59s000       114x       111x  1213    2981    3898
+     60%   0h00m59s013   1h48m53s900       115x       111x  1217    3027    3964
+     60%   0h01m00s013   1h49m46s050        52x       110x  1219    3051    3988
+     61%   0h01m01s013   1h50m54s200        68x       109x  1221    3082    4002
+     62%   0h01m02s013   1h51m50s200        56x       108x  1223    3108    4028
+     62%   0h01m03s013   1h53m02s350        72x       108x  1226    3127    4043
+     63%   0h01m04s013   1h54m56s600       114x       108x  1229    3141    4058
+     64%   0h01m05s013   1h56m48s500       112x       108x  1233    3154    4079
+     65%   0h01m06s013   1h58m11s700        83x       107x  1236    3180    4104
+     66%   0h01m07s013   1h59m13s000        61x       107x  1238    3333    4255
+     66%   0h01m08s013   1h59m59s050        46x       106x  1239    3282    4211
+     67%   0h01m09s013   2h00m54s850        56x       105x  1241    3315    4234
+     67%   0h01m10s013   2h01m51s950        57x       104x  1243    3329    4245
+     68%   0h01m11s013   2h02m56s250        64x       104x  1245    3366    4281
+     69%   0h01m12s013   2h04m18s050        82x       104x  1248    3380    4293
+     70%   0h01m13s013   2h06m04s350       106x       104x  1252    3384    4301
+     70%   0h01m14s013   2h07m40s700        96x       104x  1255    3402    4321
+     71%   0h01m15s013   2h08m53s000        72x       103x  1257    3539    4445
+     72%   0h01m16s013   2h09m48s700        56x       102x  1259    3479    4401
+     72%   0h01m17s013   2h11m01s600        73x       102x  1262    3488    4408
+     73%   0h01m18s013   2h12m03s750        62x       102x  1264    3514    4431
+     73%   0h01m19s013   2h13m03s950        60x       101x  1266    3532    4450
+     74%   0h01m20s013   2h14m21s900        78x       101x  1268    3556    4472
+     75%   0h01m21s013   2h15m57s550        96x       101x  1271    3571    4487
+     76%   0h01m22s013   2h17m13s550        76x       100x  1274    3593    4510
+     77%   0h01m23s013   2h18m52s850        99x       100x  1277    4147    4815
+     77%   0h01m24s013   2h19m45s400        53x       100x  1279    3649    4580
+     78%   0h01m25s013   2h20m57s800        72x        99x  1281    3650    4569
+     79%   0h01m26s013   2h22m16s750        79x        99x  1284    3659    4582
+     79%   0h01m27s013   2h23m23s200        66x        99x  1286    3665    4590
+     80%   0h01m28s013   2h24m57s600        94x        99x  1289    3671    4596
+     81%   0h01m29s013   2h26m28s550        91x        99x  1292    3673    4602
+     82%   0h01m30s013   2h27m52s000        83x        99x  1295    3681    4612
+     82%   0h01m31s013   2h29m04s450        72x        98x  1298    3697    4644
+     83%   0h01m32s013   2h30m05s400        61x        98x  1300    3745    4689
+     83%   0h01m33s013   2h31m03s000        58x        97x  1302    3764    4697
+     84%   0h01m34s013   2h32m04s900        62x        97x  1304    3780    4710
+     85%   0h01m35s013   2h33m14s650        70x        97x  1306    3801    4729
+     85%   0h01m36s013   2h34m08s350        54x        96x  1308    3802    4731
+     86%   0h01m37s013   2h34m58s700        50x        96x  1309    3802    4734
+     86%   0h01m38s013   2h35m49s200        51x        95x  1311    3809    4743
+     87%   0h01m39s013   2h36m46s350        57x        95x  1313    3811    4744
+     87%   0h01m40s015   2h37m17s150        31x        94x  1314    3814    4749
+     87%   0h01m41s015   2h37m58s800        42x        94x  1315    3823    4758
+     88%   0h01m42s016   2h38m51s500        53x        93x  1317    3845    4778
+     88%   0h01m43s016   2h39m07s950        16x        93x  1318    3864    4815
+     88%   0h01m44s016   2h39m43s600        36x        92x  1319    3927    4880
+     89%   0h01m45s016   2h40m28s550        45x        92x  1320    3910    4863
+     89%   0h01m46s016   2h41m17s650        49x        91x  1322    3945    4878
+     90%   0h01m47s016   2h42m21s350        64x        91x  1324    3968    4898
+     90%   0h01m48s016   2h43m16s600        55x        91x  1326    3968    4900
+     91%   0h01m49s016   2h44m28s450        72x        91x  1328    3997    4931
+     91%   0h01m50s016   2h45m22s000        54x        90x  1330    4004    4936
+     92%   0h01m51s016   2h46m54s450        92x        90x  1333    4004    4938
+     93%   0h01m52s016   2h47m59s250        65x        90x  1335    4011    4948
+     93%   0h01m53s016   2h48m59s100        60x        90x  1337    4131    5072
+     94%   0h01m54s016   2h49m34s900        36x        89x  1339    4116    5063
+     94%   0h01m55s049   2h50m17s050        41x        89x  1340    4137    5081
+     94%   0h01m56s049   2h50m55s100        38x        88x  1341    4175    5103
+     95%   0h01m57s049   2h51m16s400        21x        88x  1342    4174    5103
+     95%   0h01m58s049   2h51m50s400        34x        87x  1343    4192    5119
+     95%   0h01m59s049   2h52m17s150        27x        87x  1344    4197    5126
+     96%   0h02m00s049   2h52m52s800        36x        86x  1345    4215    5143
+     96%   0h02m01s049   2h53m16s450        24x        86x  1346    4222    5149
+     96%   0h02m02s049   2h53m51s450        35x        85x  1347    4230    5160
+     96%   0h02m03s049   2h54m22s500        31x        85x  1348    4242    5170
+     97%   0h02m04s049   2h54m58s950        36x        85x  1349    4242    5172
+     97%   0h02m05s049   2h55m27s700        29x        84x  1350    4244    5174
+     98%   0h02m06s049   2h56m25s250        58x        84x  1352    4261    5188
+     98%   0h02m07s049   2h57m39s600        74x        84x  1355    4270    5200
+     99%   0h02m08s049   2h58m53s550        74x        84x  1357    5689    5964
+     99%   0h02m09s049   2h59m18s100        25x        83x  1358    4349    5291
+     99%   0h02m10s049   2h59m51s700        34x        83x  1359    4382    5321
+### EVENTS STATUS ##############################################################
+conn_initiate :      3 event(s) for    3 target(s)
+conn_send     :      1 event(s) for    1 target(s)
+do_ping       :   4374 event(s) for  454 target(s)
+do_pong       :     11 event(s) for   10 target(s)
+do_pool_conne :    924 event(s) for  924 target(s)
+start_node    :      1 event(s) for    1 target(s)
+### NODES STATUS ###############################################################
+DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
+Inbound connections                                    0       3       0     100
+Outbound connections                                   0       3       0      10
+Known peers                                            2     143       2     453
+Known peers (%)                                        0      11       0      33
+Pooled verified peers                                  2     138       2     448
+Pooled verified peers (%)                              0      10       0      33
+### OUTLIER INFORMATION ########################################################
+Nodes with the MOST outbound connections:
+  Node  741:    10 connection(s)
+  Node  736:    10 connection(s)
+  Node  311:    10 connection(s)
+  Node  700:    10 connection(s)
+Nodes with the LESS outbound connections:
+  Node  758:     0 connection(s)
+  Node  234:     0 connection(s)
+  Node  309:     0 connection(s)
+  Node  415:     0 connection(s)
+Nodes with the MOST inbound connections:
+  Node  285:   100 connection(s) (trusted)
+  Node  121:   100 connection(s) (trusted)
+  Node  407:    32 connection(s)
+  Node   54:    28 connection(s)
+Nodes with the LESS inbound connections:
+  Node  758:     0 connection(s)
+  Node  234:     0 connection(s)
+  Node  309:     0 connection(s)
+  Node  415:     0 connection(s)
+Nodes with the MOST pooled verified peers:
+  Node  575:   448 peer(s)
+  Node   39:   448 peer(s)
+  Node  166:   447 peer(s)
+  Node    4:   446 peer(s)
+Nodes with the LESS pooled verified peers:
+  Node  758:     2 peer(s)
+  Node  234:     2 peer(s)
+  Node  309:     2 peer(s)
+  Node  415:     2 peer(s)
+### NODES METRICS ##############################################################
+DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
+connections.accepted                                   1      11       8     247
+connections.connect                                    6     347      48    2504
+connections.count.inbound                              1      11       8     100
+connections.count.outbound                             0      10      10      10
+connections.disconnect                                 1      36       1     147
+connections.established.inbound                        1      11       8     247
+connections.established.outbound                       1      10      11      14
+connections.failed                                     6     343      48    2493
+connections.pruned                                     1       1       1       2
+connections.rejected                                   1    1044     795   24656
+connections.retry                                      4     277      46    2183
+connections.terminated.inbound                         1      36       1     147
+connections.terminated.outbound                        1       1       1       4
+gossip.received                                        1    1022     793    9416
+peers.expired                                          9      86      91     276
+pool.known                                             2     138       2     448
+pool.verified                                          2     138       2     448
+### METRICS GRAPHS #############################################################
+DATABASE: /Users/juraj/data/project/github/aesim/simulations/20191217132306011/metrics/metrics.rrd
+RRDTOOL PARAMETERS: --start 1576537200 --end 1576548000
+INDEX: file:///Users/juraj/data/project/github/aesim/simulations/20191217132306011/metrics/metrics.html
+################################################################################
+### SIMULATION DONE : normal ###################################################
+################################################################################
