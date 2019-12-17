@@ -361,4 +361,67 @@ peers is set to 8.
 #### Results
 
 The [report](report/limited-connections/gossip-time4/report.txt) can be consulted
-in the 'report/limited-connections/gossip-time2' directory.
+in the 'report/limited-connections/gossip-time4' directory.
+
+Protocol With Changed Parameters And Connection Limitation - Larger Network
+----------------------------------------------------------------------------
+
+### Protocol Description
+
+This is the same protocol as [Current Protocol](#current-protocol) with changes:
+- number of inbound/outbound connection is limited:
+  - 20 outbound (was 10), 100 inbound
+- number of gossiped peers is 8 (was 32)
+- max rejections decreased to 2 (was 7), this is changed in the code:
+
+```
+diff --git a/src/pools/aesim_pool_simple.erl b/src/pools/aesim_pool_simple.erl
+index 3a8d252..bd55ab3 100644
+--- a/src/pools/aesim_pool_simple.erl
++++ b/src/pools/aesim_pool_simple.erl
+@@ -15,8 +15,8 @@
+
+ %=== MACROS ====================================================================
+
+--define(BACKOFF_TIMES, [5, 15, 30, 60, 120, 300, 600]).
+--define(MAX_RETRIES, 7).
++-define(BACKOFF_TIMES, [5, 15]).
++-define(MAX_RETRIES, 2).
+
+ %=== EXPORTS ===================================================================
+```
+
+### Simple Simulation
+
+Same as [Current Protocol](#current-protocol) simple simulation with a limit of
+20 outbound connections and 100 inbound connections (soft limit). The simulation
+starts with 1000 nodes, maximum number of nodes is 2000. The most important
+aspect of this simulation is connection rejection probability, which is set to
+99% (only 1% of connection attempts succeeds), the max rejections is set to 2
+(as opposed to 7 by default). Also, Number of gossiped peers is set to 8.
+
+#### Command Line
+
+  `aesim max_sim_time=3h bootstrap_size=1000 max_nodes=2000 reject_iprob=99 gossiped_neighbours=8 max_outbound=20 soft_max_inbound=100 max_inbound=1000 rrd_enabled=true`
+
+#### Results
+
+The [report](report/limited-connections/simple5/report.txt) and
+[metrics](report/limited-connections/simple5/metrics/metrics.md) can be
+consulted in the 'report/limited-connections/simple5' directory.
+
+### Cluster Discovery Time
+
+Same as [Current Protocol](#current-protocol) cluster discovery time simulation
+with a limit of 20 outbound connections and 100 inbound connections (soft
+limit). The simulation starts with 1000 nodes, maximum number of nodes is 2000
+and conenctions rejection probabilty is 99%. The max rejections is set to 2, the
+number of gossiped peers is set to 8.
+
+#### Command line
+
+  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h bootstrap_size=1000 max_nodes=2000 reject_iprob=99 gossiped_neighbours=8 max_outbound=20 soft_max_inbound=100 max_inbound=1000`
+
+#### Results
+
+TODO: simulation timeout.
