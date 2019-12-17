@@ -48,9 +48,9 @@
 -define(DEFAULT_PING_PERIOD,               "2m").
 -define(DEFAULT_PONG_DELAY,                 100).
 -define(DEFAULT_GOSSIPED_NEIGHBOURS,         32).
--define(DEFAULT_MAX_INBOUND,               1000).
--define(DEFAULT_SOFT_MAX_INBOUND,           100).
--define(DEFAULT_MAX_OUTBOUND,                10).
+-define(DEFAULT_MAX_INBOUND,           infinity).
+-define(DEFAULT_SOFT_MAX_INBOUND,      infinity).
+-define(DEFAULT_MAX_OUTBOUND,          infinity).
 -define(DEFAULT_CONNECT_PERIOD,               0).
 -define(DEFAULT_LIMIT_OUTBOUND_GROUPS,    false).
 
