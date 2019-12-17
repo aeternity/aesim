@@ -126,11 +126,11 @@ only difference that the number of inbound/outbound connection is limited.
 ### Simple Simulation
 
 Same as [Current Protocol](#current-protocol) simple simulation with a limit
-of 10 outbound connections and 1000 inbound connections.
+of 10 outbound connections and 100 inbound connections (soft limit).
 
 #### Command line
 
-  `aesim max_sim_time=3h max_nodes=300 max_outbound=10 max_inbound=1000 rrd_enabled=true`
+  `aesim max_sim_time=3h max_nodes=300 max_outbound=10 soft_max_inbound=100 max_inbound=1000 rrd_enabled=true`
 
 #### Results
 
