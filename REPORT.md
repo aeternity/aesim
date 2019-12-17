@@ -300,3 +300,65 @@ and conenctions rejection probabilty is 99%.
 #### Results
 
 TODO: simulation timeout.
+
+Protocol With Changed Parameters And Connection Limitation - Smaller Network
+----------------------------------------------------------------------------
+
+### Protocol Description
+
+This is the same protocol as [Current Protocol](#current-protocol) with changes:
+- number of inbound/outbound connection is limited:
+  - 20 outbound (was 10), 100 inbound
+- number of gossiped peers is 8 (was 32)
+- max rejections decreased to 2 (was 7), this is changed in the code:
+
+```
+diff --git a/src/pools/aesim_pool_simple.erl b/src/pools/aesim_pool_simple.erl
+index 3a8d252..bd55ab3 100644
+--- a/src/pools/aesim_pool_simple.erl
++++ b/src/pools/aesim_pool_simple.erl
+@@ -15,8 +15,8 @@
+
+ %=== MACROS ====================================================================
+
+--define(BACKOFF_TIMES, [5, 15, 30, 60, 120, 300, 600]).
+--define(MAX_RETRIES, 7).
++-define(BACKOFF_TIMES, [5, 15]).
++-define(MAX_RETRIES, 2).
+
+ %=== EXPORTS ===================================================================
+```
+
+### Simple Simulation
+
+Same as [Current Protocol](#current-protocol) simple simulation with a limit
+of 20 outbound connections and 100 inbound connections (soft limit). Also,
+maximum number of nodes is set to 100, which is more realistic scenario as
+it's unlikely there is more than ~100 nodes (on mainnet or testnet). Number of
+gossiped peers is set to 8.
+
+#### Command Line
+
+  `aesim max_sim_time=3h max_nodes=100 gossiped_neighbours=8 max_outbound=20 soft_max_inbound=100 max_inbound=1000 rrd_enabled=true`
+
+#### Results
+
+The [report](report/limited-connections/simple4/report.txt) and
+[metrics](report/limited-connections/simple4/metrics/metrics.md) can be
+consulted in the 'report/limited-connections/simple4' directory.
+
+### Cluster Discovery Time
+
+Same as [Current Protocol](#current-protocol) cluster discovery time simulation
+with a limit of 20 outbound connections and 100 inbound connections (soft
+limit). The maximum number of nodes is set to 100 and the number of gossiped
+peers is set to 8.
+
+#### Command line
+
+  `aesim scenario_mod=aesim_scenario_gossip_time max_sim_time=4h max_nodes=100 gossiped_neighbours=8 max_outbound=20 soft_max_inbound=100 max_inbound=1000`
+
+#### Results
+
+The [report](report/limited-connections/gossip-time4/report.txt) can be consulted
+in the 'report/limited-connections/gossip-time2' directory.

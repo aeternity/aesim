@@ -1,0 +1,106 @@
+### CONFIGURATION ##############################################################
+accept_delay          :                          50 integer           (default)
+address_ranges        :                             string            (default)
+bootstrap_size        :                           3 integer           (default)
+conn_mod              :    aesim_connection_default atom              (default)
+connect_delay         :                         100 integer           (default)
+connect_period        :                           0 integer_infinity  (default)
+disconnect_delay      :                          50 integer           (default)
+first_ping_delay      :                         100 time              (default)
+gossiped_neighbours   :                           8 integer                    
+limit_outbound_groups :                       false boolean           (default)
+max_inbound           :                        1000 integer_infinity           
+max_nodes             :                         100 integer                    
+max_outbound          :                          20 integer_infinity           
+max_real_time         :                    infinity time_infinity     (default)
+max_sim_time          :                          3h time_infinity              
+node_mod              :          aesim_node_default atom              (default)
+node_start_period     :                         30s time              (default)
+ping_period           :                          2m time              (default)
+pong_delay            :                         100 time              (default)
+pool_mod              :           aesim_pool_simple atom              (default)
+progress_interval     :                          1s time              (default)
+reject_delay          :                          50 integer           (default)
+reject_iprob          :                           0 integer           (default)
+rrd_enabled           :                        true boolean                    
+rrd_ignore_trusted    :                       false boolean           (default)
+scenario_mod          :      aesim_scenario_default atom              (default)
+soft_max_inbound      :                         100 integer_infinity           
+trusted_count         :                           2 integer           (default)
+### SIMULATION #################################################################
+PROGRESS     REAL-TIME      SIM-TIME CURR-SPEED GLOB-SPEED NODES   CONNS  EVENTS
+     20%   0h00m01s000   0h36m31s700      2192x      2192x    76    1481    1482
+     28%   0h00m02s000   0h50m31s700       840x      1516x   100    1961    1961
+     35%   0h00m03s000   1h04m33s400       842x      1291x   100    1961    1961
+     43%   0h00m04s000   1h18m34s400       841x      1179x   100    1961    1961
+     51%   0h00m05s000   1h33m04s700       870x      1117x   100    1961    1961
+     59%   0h00m06s000   1h47m34s100       869x      1076x   100    1961    1961
+     67%   0h00m07s000   2h02m03s950       870x      1046x   100    1961    1961
+     75%   0h00m08s000   2h16m06s400       842x      1021x   100    1961    1962
+     83%   0h00m09s000   2h30m36s700       870x      1004x   100    1961    1961
+     91%   0h00m10s000   2h45m07s400       871x       991x   100    1961    1962
+     99%   0h00m11s000   2h59m08s500       841x       977x   100    1961    1961
+### EVENTS STATUS ##############################################################
+conn_send     :      1 event(s) for    1 target(s)
+do_ping       :   1960 event(s) for   99 target(s)
+### NODES STATUS ###############################################################
+DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
+Inbound connections                                    0      20      16      99
+Outbound connections                                   0      20      20      20
+Known peers                                           99      99      99      99
+Known peers (%)                                      100     100     100     100
+Pooled verified peers                                 99      99      99      99
+Pooled verified peers (%)                            100     100     100     100
+### OUTLIER INFORMATION ########################################################
+Nodes with the MOST outbound connections:
+  Node   12:    20 connection(s)
+  Node    4:    20 connection(s)
+  Node   38:    20 connection(s)
+  Node   16:    20 connection(s)
+Nodes with the LESS outbound connections:
+  Node    3:     0 connection(s) (trusted)
+  Node    2:     1 connection(s) (trusted)
+  Node   12:    20 connection(s)
+  Node    4:    20 connection(s)
+Nodes with the MOST inbound connections:
+  Node    3:    99 connection(s) (trusted)
+  Node    2:    98 connection(s) (trusted)
+  Node    6:    52 connection(s)
+  Node    4:    50 connection(s)
+Nodes with the LESS inbound connections:
+  Node   92:     0 connection(s)
+  Node   96:     0 connection(s)
+  Node  100:     0 connection(s)
+  Node   97:     0 connection(s)
+Nodes with the MOST pooled verified peers:
+  Node   12:    99 peer(s)
+  Node    4:    99 peer(s)
+  Node   38:    99 peer(s)
+  Node   16:    99 peer(s)
+Nodes with the LESS pooled verified peers:
+  Node   12:    99 peer(s)
+  Node    4:    99 peer(s)
+  Node   38:    99 peer(s)
+  Node   16:    99 peer(s)
+### NODES METRICS ##############################################################
+DESCRIPTION                                      MINIMUM AVERAGE  MEDIAN MAXIMUM
+connections.accepted                                   1      22      18      99
+connections.connect                                    1      20      20      25
+connections.count.inbound                              1      21      18      99
+connections.count.outbound                             0      20      20      20
+connections.disconnect                                 1       2       1       4
+connections.established.inbound                        1      22      18      99
+connections.established.outbound                       1      20      20      23
+connections.pruned                                     1       2       2       6
+connections.terminated.inbound                         1       2       1       4
+connections.terminated.outbound                        1       1       1       3
+gossip.received                                     1320    3044    2816    7758
+pool.known                                            99      99      99      99
+pool.verified                                         99      99      99      99
+### METRICS GRAPHS #############################################################
+DATABASE: /Users/juraj/data/project/github/aesim/simulations/20191217135614284/metrics/metrics.rrd
+RRDTOOL PARAMETERS: --start 1576537200 --end 1576548000
+INDEX: file:///Users/juraj/data/project/github/aesim/simulations/20191217135614284/metrics/metrics.html
+################################################################################
+### SIMULATION DONE : normal ###################################################
+################################################################################
